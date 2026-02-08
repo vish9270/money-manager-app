@@ -12,7 +12,7 @@ import {
   sampleGoals, sampleRecurring, sampleDebts, sampleInvestments 
 } from '@/mocks/sampleData';
 import { generateId, getMonthKey, getStartOfMonth, getEndOfMonth } from '@/utils/helpers';
-import { initializeDatabase } from '@/db/database';
+import { initializeDatabase } from '@/db/repositories/database';
 import * as accountRepo from '@/db/repositories/accountRepository';
 import * as categoryRepo from '@/db/repositories/categoryRepository';
 import * as transactionRepo from '@/db/repositories/transactionRepository';

@@ -1,4 +1,4 @@
-import { runQuery, runStatement } from '../database';
+import { runQuery, runStatement } from './database';
 import { Investment } from '@/types';
 
 interface InvestmentRow {

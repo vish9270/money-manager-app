@@ -1,4 +1,4 @@
-import { runQuery, runStatement } from '../database';
+import { runQuery, runStatement } from './database';
 import { Goal } from '@/types';
 
 interface GoalRow {

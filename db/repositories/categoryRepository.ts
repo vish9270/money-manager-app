@@ -1,4 +1,4 @@
-import { runQuery, runStatement } from '../database';
+import { runQuery, runStatement } from './database';
 import { Category } from '@/types';
 
 interface CategoryRow {
@@ -40,7 +40,7 @@ export async function getCategoryById(id: string): Promise<Category | null> {
 
 export async function createCategory(category: Category): Promise<void> {
   await runStatement(
-    `INSERT INTO categories (id, name, icon, color, type, parent_id, is_system)
+    `INSERT OR IGNORE INTO categories (id, name, icon, color, type, parent_id, is_system)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       category.id,

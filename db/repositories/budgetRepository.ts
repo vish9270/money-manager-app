@@ -1,4 +1,4 @@
-import { runQuery, runStatement, runTransaction, getDatabase } from '../database';
+import { runQuery, runStatement, runTransaction, getDatabase } from './database';
 import { Budget, BudgetLine } from '@/types';
 
 interface BudgetRow {
