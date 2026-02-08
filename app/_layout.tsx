@@ -38,7 +38,7 @@ function RootLayoutNav() {
       />
       <Stack.Screen name="goals" options={{ headerShown: true }} />
       <Stack.Screen name="recurring" options={{ headerShown: true }} />
-      <Stack.Screen name="investments" options={{ headerShown: true }} />
+      <Stack.Screen name="investment" options={{ headerShown: true }} />
       <Stack.Screen name="debts" options={{ headerShown: true }} />
       <Stack.Screen name="reports" options={{ headerShown: true }} />
       <Stack.Screen name="import" options={{ headerShown: true }} />

@@ -3,11 +3,12 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "bunx rork start -p gx313375kakdh6daemav9 --tunnel",
-    "start-web": "bunx rork start -p gx313375kakdh6daemav9 --web --tunnel",
-    "start-web-dev": "DEBUG=expo* bunx rork start -p gx313375kakdh6daemav9 --web --tunnel",
-    "lint": "expo lint"
-  },
+  "start": "expo start",
+  "android": "expo start --android",
+  "ios": "expo start --ios",
+  "web": "expo start --web",
+  "lint": "expo lint"
+},
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@nkzw/create-context-hook": "^1.1.0",
