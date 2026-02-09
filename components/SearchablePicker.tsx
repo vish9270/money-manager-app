@@ -9,7 +9,7 @@ import {
   FlatList,
   Pressable,
 } from 'react-native';
-import { Search, X, Check, ChevronDown } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 
 interface PickerItem {
@@ -82,7 +82,7 @@ export default function SearchablePicker({
           >
             {item.name}
           </Text>
-          {isSelected && <Check size={18} color={Colors.accent} />}
+          {isSelected && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
         </TouchableOpacity>
       );
     },
@@ -111,7 +111,7 @@ export default function SearchablePicker({
         ) : (
           <Text style={styles.placeholder}>{placeholder}</Text>
         )}
-        <ChevronDown size={20} color={Colors.textSecondary} />
+        <Ionicons name="chevron-down" size={20} color={Colors.textSecondary} />
       </TouchableOpacity>
 
       <Modal
@@ -127,12 +127,12 @@ export default function SearchablePicker({
                 {label || 'Select an option'}
               </Text>
               <TouchableOpacity onPress={handleClose}>
-                <X size={24} color={Colors.textSecondary} />
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.searchContainer}>
-              <Search size={18} color={Colors.textMuted} />
+              <Ionicons name="search" size={18} color={Colors.textMuted} />
               <TextInput
                 style={styles.searchInput}
                 placeholder={searchPlaceholder}
@@ -143,7 +143,7 @@ export default function SearchablePicker({
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <X size={18} color={Colors.textMuted} />
+                  <Ionicons name="close" size={18} color={Colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>

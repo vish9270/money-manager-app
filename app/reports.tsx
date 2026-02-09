@@ -1,23 +1,39 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Text, ScrollView } from 'react-native';
 import { Stack } from 'expo-router';
-import { FileText, TrendingUp, TrendingDown, PieChart } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 import { useMoney } from '@/providers/MoneyProvider';
 import { formatCurrency, getPreviousMonths, getMonthYear } from '@/utils/helpers';
 import BarChart from '@/components/BarChart';
 
 export default function ReportsScreen() {
-  const { getMonthlyStats, selectedMonth, categories, getCategoryById } = useMoney();
+  const { getMonthlyStats, selectedMonth, getCategoryById } = useMoney();
 
-  const stats = useMemo(() => getMonthlyStats(selectedMonth), [selectedMonth, getMonthlyStats]);
+  const stats = useMemo(
+    () => getMonthlyStats(selectedMonth),
+    [selectedMonth, getMonthlyStats]
+  );
 
   const last6MonthsData = useMemo(() => {
     const months = getPreviousMonths(6).reverse();
-    return months.map(month => {
+    return months.map((month) => {
       const monthStats = getMonthlyStats(month);
       const [, m] = month.split('-');
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthNames = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       return {
         label: monthNames[parseInt(m) - 1],
         income: monthStats.totalIncome,
@@ -37,48 +53,57 @@ export default function ReportsScreen() {
     return total / last6MonthsData.length;
   }, [last6MonthsData]);
 
-  const savingsRate = stats.totalIncome > 0 
-    ? ((stats.surplus / stats.totalIncome) * 100).toFixed(1)
-    : '0';
+  const savingsRate =
+    stats.totalIncome > 0 ? ((stats.surplus / stats.totalIncome) * 100).toFixed(1) : '0';
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Reports' }} />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.periodCard}>
-          <FileText size={20} color={Colors.accent} />
+          <Ionicons name="document-text-outline" size={20} color={Colors.accent} />
           <Text style={styles.periodText}>{getMonthYear(`${selectedMonth}-01`)}</Text>
         </View>
 
         <View style={styles.summaryGrid}>
           <View style={styles.summaryCard}>
-            <TrendingUp size={20} color={Colors.income} />
+            <Ionicons name="trending-up-outline" size={20} color={Colors.income} />
             <Text style={styles.summaryLabel}>Total Income</Text>
             <Text style={[styles.summaryValue, styles.incomeValue]}>
               {formatCurrency(stats.totalIncome)}
             </Text>
           </View>
+
           <View style={styles.summaryCard}>
-            <TrendingDown size={20} color={Colors.expense} />
+            <Ionicons name="trending-down-outline" size={20} color={Colors.expense} />
             <Text style={styles.summaryLabel}>Total Expense</Text>
             <Text style={[styles.summaryValue, styles.expenseValue]}>
               {formatCurrency(stats.totalExpense)}
             </Text>
           </View>
+
           <View style={styles.summaryCard}>
-            <PieChart size={20} color={Colors.accent} />
+            <Ionicons name="pie-chart-outline" size={20} color={Colors.accent} />
             <Text style={styles.summaryLabel}>Savings Rate</Text>
             <Text style={[styles.summaryValue, styles.accentValue]}>{savingsRate}%</Text>
           </View>
+
           <View style={styles.summaryCard}>
-            <TrendingUp size={20} color={stats.surplus >= 0 ? Colors.income : Colors.expense} />
+            <Ionicons
+              name="trending-up-outline"
+              size={20}
+              color={stats.surplus >= 0 ? Colors.income : Colors.expense}
+            />
             <Text style={styles.summaryLabel}>Net Surplus</Text>
-            <Text style={[
-              styles.summaryValue, 
-              stats.surplus >= 0 ? styles.incomeValue : styles.expenseValue
-            ]}>
-              {stats.surplus >= 0 ? '+' : ''}{formatCurrency(stats.surplus)}
+            <Text
+              style={[
+                styles.summaryValue,
+                stats.surplus >= 0 ? styles.incomeValue : styles.expenseValue,
+              ]}
+            >
+              {stats.surplus >= 0 ? '+' : ''}
+              {formatCurrency(stats.surplus)}
             </Text>
           </View>
         </View>
@@ -95,15 +120,21 @@ export default function ReportsScreen() {
           <View style={styles.avgCard}>
             <View style={styles.avgRow}>
               <Text style={styles.avgLabel}>Avg. Monthly Income</Text>
-              <Text style={[styles.avgValue, styles.incomeValue]}>{formatCurrency(avgIncome)}</Text>
+              <Text style={[styles.avgValue, styles.incomeValue]}>
+                {formatCurrency(avgIncome)}
+              </Text>
             </View>
             <View style={styles.avgRow}>
               <Text style={styles.avgLabel}>Avg. Monthly Expense</Text>
-              <Text style={[styles.avgValue, styles.expenseValue]}>{formatCurrency(avgExpense)}</Text>
+              <Text style={[styles.avgValue, styles.expenseValue]}>
+                {formatCurrency(avgExpense)}
+              </Text>
             </View>
             <View style={styles.avgRow}>
               <Text style={styles.avgLabel}>Avg. Monthly Savings</Text>
-              <Text style={[styles.avgValue, styles.accentValue]}>{formatCurrency(avgIncome - avgExpense)}</Text>
+              <Text style={[styles.avgValue, styles.accentValue]}>
+                {formatCurrency(avgIncome - avgExpense)}
+              </Text>
             </View>
           </View>
         </View>
@@ -113,15 +144,22 @@ export default function ReportsScreen() {
           <View style={styles.categoryList}>
             {stats.categoryBreakdown.slice(0, 5).map((item, index) => {
               const category = getCategoryById(item.categoryId);
-              const percent = stats.totalExpense > 0 
-                ? ((item.amount / stats.totalExpense) * 100).toFixed(1)
-                : '0';
+              const percent =
+                stats.totalExpense > 0
+                  ? ((item.amount / stats.totalExpense) * 100).toFixed(1)
+                  : '0';
+
               return (
                 <View key={item.categoryId} style={styles.categoryItem}>
                   <View style={styles.categoryRank}>
                     <Text style={styles.rankText}>{index + 1}</Text>
                   </View>
-                  <View style={[styles.categoryDot, { backgroundColor: category?.color || Colors.textMuted }]} />
+                  <View
+                    style={[
+                      styles.categoryDot,
+                      { backgroundColor: category?.color || Colors.textMuted },
+                    ]}
+                  />
                   <Text style={styles.categoryName}>{category?.name || 'Unknown'}</Text>
                   <Text style={styles.categoryPercent}>{percent}%</Text>
                   <Text style={styles.categoryAmount}>{formatCurrency(item.amount)}</Text>

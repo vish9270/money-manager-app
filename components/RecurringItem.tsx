@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Switch } from 'react-native';
-import { Calendar, ArrowDownLeft, ArrowUpRight, ArrowLeftRight } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 import { Recurring, Category } from '@/types';
 import { formatFullCurrency, formatShortDate } from '@/utils/helpers';
@@ -15,23 +15,33 @@ interface RecurringItemProps {
 export default function RecurringItem({ item, category, onToggle, onPress }: RecurringItemProps) {
   const getTypeIcon = () => {
     switch (item.type) {
-      case 'income': return <ArrowDownLeft size={16} color={Colors.income} />;
-      case 'expense': return <ArrowUpRight size={16} color={Colors.expense} />;
-      case 'transfer': return <ArrowLeftRight size={16} color={Colors.transfer} />;
+      case 'income':
+        return <Ionicons name="arrow-down-outline" size={16} color={Colors.income} />;
+      case 'expense':
+        return <Ionicons name="arrow-up-outline" size={16} color={Colors.expense} />;
+      case 'transfer':
+        return <Ionicons name="swap-horizontal-outline" size={16} color={Colors.transfer} />;
+      default:
+        return <Ionicons name="help-outline" size={16} color={Colors.textMuted} />;
     }
   };
 
   const getTypeColor = () => {
     switch (item.type) {
-      case 'income': return Colors.income;
-      case 'expense': return Colors.expense;
-      case 'transfer': return Colors.transfer;
+      case 'income':
+        return Colors.income;
+      case 'expense':
+        return Colors.expense;
+      case 'transfer':
+        return Colors.transfer;
+      default:
+        return Colors.textMuted;
     }
   };
 
   return (
-    <TouchableOpacity 
-      style={[styles.container, !item.isActive && styles.inactive]} 
+    <TouchableOpacity
+      style={[styles.container, !item.isActive && styles.inactive]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -45,15 +55,18 @@ export default function RecurringItem({ item, category, onToggle, onPress }: Rec
             {formatFullCurrency(item.amount)}
           </Text>
         </View>
+
         <View style={styles.bottomRow}>
           <View style={styles.scheduleInfo}>
-            <Calendar size={12} color={Colors.textMuted} />
+            <Ionicons name="calendar-outline" size={12} color={Colors.textMuted} />
             <Text style={styles.schedule}>
-              {item.frequency.charAt(0).toUpperCase() + item.frequency.slice(1)} • Day {item.dayOfMonth || 1}
+              {item.frequency.charAt(0).toUpperCase() + item.frequency.slice(1)} • Day{' '}
+              {item.dayOfMonth || 1}
             </Text>
           </View>
           <Text style={styles.nextRun}>Next: {formatShortDate(item.nextRunDate)}</Text>
         </View>
+
         {category && (
           <View style={styles.categoryRow}>
             <View style={[styles.categoryDot, { backgroundColor: category.color }]} />
@@ -61,6 +74,7 @@ export default function RecurringItem({ item, category, onToggle, onPress }: Rec
           </View>
         )}
       </View>
+
       <Switch
         value={item.isActive}
         onValueChange={onToggle}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Text, Switch } from 'react-native';
 import { Stack } from 'expo-router';
-import { Bell, AlertTriangle, Calendar, Target, CreditCard } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 
 export default function NotificationsScreen() {
@@ -13,18 +13,20 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Notifications' }} />
-      
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Alert Settings</Text>
-        
+
         <View style={styles.settingsList}>
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <AlertTriangle size={20} color={Colors.warning} />
+              <Ionicons name="warning-outline" size={20} color={Colors.warning} />
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Budget Alerts</Text>
-              <Text style={styles.settingDesc}>Get notified when approaching budget limits</Text>
+              <Text style={styles.settingDesc}>
+                Get notified when approaching budget limits
+              </Text>
             </View>
             <Switch
               value={budgetAlerts}
@@ -33,14 +35,20 @@ export default function NotificationsScreen() {
               thumbColor={budgetAlerts ? Colors.accent : Colors.textMuted}
             />
           </View>
-          
+
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Calendar size={20} color={Colors.chart.blue} />
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color={Colors.chart.blue}
+              />
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Recurring Reminders</Text>
-              <Text style={styles.settingDesc}>Remind before upcoming recurring payments</Text>
+              <Text style={styles.settingDesc}>
+                Remind before upcoming recurring payments
+              </Text>
             </View>
             <Switch
               value={recurringReminders}
@@ -49,14 +57,20 @@ export default function NotificationsScreen() {
               thumbColor={recurringReminders ? Colors.accent : Colors.textMuted}
             />
           </View>
-          
+
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Target size={20} color={Colors.chart.purple} />
+              <Ionicons
+                name="flag-outline"
+                size={20}
+                color={Colors.chart.purple}
+              />
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Goal Milestones</Text>
-              <Text style={styles.settingDesc}>Celebrate when reaching goal milestones</Text>
+              <Text style={styles.settingDesc}>
+                Celebrate when reaching goal milestones
+              </Text>
             </View>
             <Switch
               value={goalMilestones}
@@ -65,14 +79,20 @@ export default function NotificationsScreen() {
               thumbColor={goalMilestones ? Colors.accent : Colors.textMuted}
             />
           </View>
-          
+
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <CreditCard size={20} color={Colors.chart.red} />
+              <Ionicons
+                name="card-outline"
+                size={20}
+                color={Colors.chart.red}
+              />
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Debt Reminders</Text>
-              <Text style={styles.settingDesc}>EMI and credit card payment reminders</Text>
+              <Text style={styles.settingDesc}>
+                EMI and credit card payment reminders
+              </Text>
             </View>
             <Switch
               value={debtReminders}

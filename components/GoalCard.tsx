@@ -1,15 +1,20 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { 
-  Shield, Car, Plane, Home, GraduationCap, Gift, Target, Sparkles
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 import { Goal } from '@/types';
 import { formatCurrency, calculateProgress, getRelativeTime } from '@/utils/helpers';
 import ProgressBar from './ProgressBar';
 
-const iconMap: Record<string, React.ComponentType<{ size: number; color: string }>> = {
-  Shield, Car, Plane, Home, GraduationCap, Gift, Target, Sparkles,
+const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
+  Shield: 'shield-outline',
+  Car: 'car-outline',
+  Plane: 'airplane-outline',
+  Home: 'home-outline',
+  GraduationCap: 'school-outline',
+  Gift: 'gift-outline',
+  Target: 'flag-outline',
+  Sparkles: 'sparkles-outline',
 };
 
 interface GoalCardProps {
@@ -19,17 +24,19 @@ interface GoalCardProps {
 }
 
 export default function GoalCard({ goal, onPress, compact = false }: GoalCardProps) {
-  const IconComponent = iconMap[goal.icon] || Target;
+  const iconName = iconMap[goal.icon] || 'flag-outline';
   const progress = calculateProgress(goal.savedAmount, goal.targetAmount);
-  
+
   if (compact) {
     return (
       <TouchableOpacity style={styles.compactContainer} onPress={onPress} activeOpacity={0.7}>
         <View style={[styles.compactIcon, { backgroundColor: goal.color + '20' }]}>
-          <IconComponent size={16} color={goal.color} />
+          <Ionicons name={iconName} size={16} color={goal.color} />
         </View>
         <View style={styles.compactContent}>
-          <Text style={styles.compactName} numberOfLines={1}>{goal.name}</Text>
+          <Text style={styles.compactName} numberOfLines={1}>
+            {goal.name}
+          </Text>
           <ProgressBar progress={progress} height={4} progressColor={goal.color} />
         </View>
         <Text style={[styles.compactProgress, { color: goal.color }]}>{progress}%</Text>
@@ -41,17 +48,21 @@ export default function GoalCard({ goal, onPress, compact = false }: GoalCardPro
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.header}>
         <View style={[styles.iconContainer, { backgroundColor: goal.color + '20' }]}>
-          <IconComponent size={22} color={goal.color} />
+          <Ionicons name={iconName} size={22} color={goal.color} />
         </View>
+
         <View style={styles.headerText}>
           <Text style={styles.name}>{goal.name}</Text>
           <Text style={styles.deadline}>{getRelativeTime(goal.targetDate)}</Text>
         </View>
+
         <View style={[styles.progressBadge, { backgroundColor: goal.color + '20' }]}>
           <Text style={[styles.progressText, { color: goal.color }]}>{progress}%</Text>
         </View>
       </View>
+
       <ProgressBar progress={progress} height={8} progressColor={goal.color} />
+
       <View style={styles.amountRow}>
         <Text style={styles.savedAmount}>{formatCurrency(goal.savedAmount)}</Text>
         <Text style={styles.targetAmount}>of {formatCurrency(goal.targetAmount)}</Text>

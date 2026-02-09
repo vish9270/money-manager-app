@@ -1,13 +1,23 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Stack } from 'expo-router';
-import { TrendingUp, PiggyBank, Plus, X, Edit2, Trash2 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useMoney } from '@/providers/MoneyProvider';
 import { formatCurrency, formatFullCurrency } from '@/utils/helpers';
 import { Investment } from '@/types';
-import ProgressBar from '@/components/ProgressBar';
 
 type InvestmentType = Investment['type'];
 
@@ -23,7 +33,13 @@ const investmentTypes: { value: InvestmentType; label: string }[] = [
 ];
 
 export default function InvestmentsScreen() {
-  const { investments, addInvestment, updateInvestment, deleteInvestment, getTotalInvestmentValue } = useMoney();
+  const {
+    investments,
+    addInvestment,
+    updateInvestment,
+    deleteInvestment,
+    getTotalInvestmentValue,
+  } = useMoney();
 
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -36,11 +52,16 @@ export default function InvestmentsScreen() {
   const [monthlyTarget, setMonthlyTarget] = useState('');
   const [notes, setNotes] = useState('');
 
-  const totalInvestedSum = useMemo(() => 
-    investments.reduce((sum, inv) => sum + inv.totalInvested, 0), [investments]);
-  
+  const totalInvestedSum = useMemo(
+    () => investments.reduce((sum, inv) => sum + inv.totalInvested, 0),
+    [investments]
+  );
+
   const totalReturns = getTotalInvestmentValue - totalInvestedSum;
-  const returnsPercent = totalInvestedSum > 0 ? ((totalReturns / totalInvestedSum) * 100).toFixed(1) : '0';
+  const returnsPercent =
+    totalInvestedSum > 0
+      ? ((totalReturns / totalInvestedSum) * 100).toFixed(1)
+      : '0';
 
   const getInvestmentColor = (investmentType: string) => {
     const colors: Record<string, string> = {
@@ -122,11 +143,9 @@ export default function InvestmentsScreen() {
     resetForm();
   };
 
-  const handleDelete = useCallback((item: Investment) => {
-    Alert.alert(
-      'Delete Investment',
-      `Are you sure you want to delete "${item.name}"?`,
-      [
+  const handleDelete = useCallback(
+    (item: Investment) => {
+      Alert.alert('Delete Investment', `Are you sure you want to delete "${item.name}"?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -134,48 +153,55 @@ export default function InvestmentsScreen() {
           onPress: () => {
             deleteInvestment(item.id);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        }
-      ]
-    );
-  }, [deleteInvestment]);
+          },
+        },
+      ]);
+    },
+    [deleteInvestment]
+  );
 
-  const handleItemPress = useCallback((item: Investment) => {
-    Alert.alert(
-      item.name,
-      'What would you like to do?',
-      [
+  const handleItemPress = useCallback(
+    (item: Investment) => {
+      Alert.alert(item.name, 'What would you like to do?', [
         { text: 'Edit', onPress: () => openEditModal(item) },
         { text: 'Delete', style: 'destructive', onPress: () => handleDelete(item) },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  }, [openEditModal, handleDelete]);
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [openEditModal, handleDelete]
+  );
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Investments' }} />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
-            <TrendingUp size={24} color={Colors.income} />
+            <Ionicons name="trending-up-outline" size={24} color={Colors.income} />
             <Text style={styles.summaryTitle}>Portfolio Value</Text>
           </View>
-          <Text style={styles.portfolioValue}>{formatFullCurrency(getTotalInvestmentValue)}</Text>
-          
+
+          <Text style={styles.portfolioValue}>
+            {formatFullCurrency(getTotalInvestmentValue)}
+          </Text>
+
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Invested</Text>
               <Text style={styles.summaryValue}>{formatCurrency(totalInvestedSum)}</Text>
             </View>
+
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Returns</Text>
-              <Text style={[
-                styles.summaryValue, 
-                totalReturns >= 0 ? styles.positiveValue : styles.negativeValue
-              ]}>
-                {totalReturns >= 0 ? '+' : ''}{formatCurrency(totalReturns)} ({returnsPercent}%)
+              <Text
+                style={[
+                  styles.summaryValue,
+                  totalReturns >= 0 ? styles.positiveValue : styles.negativeValue,
+                ]}
+              >
+                {totalReturns >= 0 ? '+' : ''}
+                {formatCurrency(totalReturns)} ({returnsPercent}%)
               </Text>
             </View>
           </View>
@@ -184,46 +210,64 @@ export default function InvestmentsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Investments</Text>
           <View style={styles.investmentList}>
-            {investments.map(inv => {
+            {investments.map((inv) => {
               const returns = inv.currentValue - inv.totalInvested;
-              const returnsPercentInv = inv.totalInvested > 0 
-                ? ((returns / inv.totalInvested) * 100).toFixed(1) 
-                : '0';
+              const returnsPercentInv =
+                inv.totalInvested > 0
+                  ? ((returns / inv.totalInvested) * 100).toFixed(1)
+                  : '0';
               const color = getInvestmentColor(inv.type);
-              
+
               return (
                 <TouchableOpacity key={inv.id} onPress={() => handleItemPress(inv)}>
                   <View style={styles.investmentCard}>
                     <View style={styles.investmentHeader}>
-                      <View style={[styles.investmentIcon, { backgroundColor: color + '20' }]}>
-                        <PiggyBank size={20} color={color} />
+                      <View
+                        style={[
+                          styles.investmentIcon,
+                          { backgroundColor: color + '20' },
+                        ]}
+                      >
+                        <Ionicons name="wallet-outline" size={20} color={color} />
                       </View>
+
                       <View style={styles.investmentInfo}>
                         <Text style={styles.investmentName}>{inv.name}</Text>
                         <Text style={styles.investmentType}>
                           {inv.type.replace('_', ' ').toUpperCase()}
                         </Text>
                       </View>
+
                       <View style={styles.investmentValues}>
-                        <Text style={styles.currentValueText}>{formatCurrency(inv.currentValue)}</Text>
-                        <Text style={[
-                          styles.returnValue,
-                          returns >= 0 ? styles.positiveValue : styles.negativeValue
-                        ]}>
-                          {returns >= 0 ? '+' : ''}{returnsPercentInv}%
+                        <Text style={styles.currentValueText}>
+                          {formatCurrency(inv.currentValue)}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.returnValue,
+                            returns >= 0 ? styles.positiveValue : styles.negativeValue,
+                          ]}
+                        >
+                          {returns >= 0 ? '+' : ''}
+                          {returnsPercentInv}%
                         </Text>
                       </View>
                     </View>
-                    
+
                     <View style={styles.investmentDetails}>
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Invested</Text>
-                        <Text style={styles.detailValue}>{formatCurrency(inv.totalInvested)}</Text>
+                        <Text style={styles.detailValue}>
+                          {formatCurrency(inv.totalInvested)}
+                        </Text>
                       </View>
+
                       {inv.monthlyTarget && (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Monthly Target</Text>
-                          <Text style={styles.detailValue}>{formatCurrency(inv.monthlyTarget)}</Text>
+                          <Text style={styles.detailValue}>
+                            {formatCurrency(inv.monthlyTarget)}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -236,16 +280,18 @@ export default function InvestmentsScreen() {
 
         {investments.length === 0 && (
           <View style={styles.emptyState}>
-            <TrendingUp size={48} color={Colors.textMuted} />
+            <Ionicons name="trending-up-outline" size={48} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No investments yet</Text>
-            <Text style={styles.emptySubtitle}>Start tracking your investment portfolio</Text>
+            <Text style={styles.emptySubtitle}>
+              Start tracking your investment portfolio
+            </Text>
           </View>
         )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -253,20 +299,27 @@ export default function InvestmentsScreen() {
           setShowModal(true);
         }}
       >
-        <Plus size={24} color={Colors.textInverse} />
+        <Ionicons name="add" size={24} color={Colors.textInverse} />
       </TouchableOpacity>
 
       <Modal visible={showModal} animationType="slide" transparent>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{isEditing ? 'Edit Investment' : 'Add Investment'}</Text>
-                <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
-                  <X size={24} color={Colors.textSecondary} />
+                <Text style={styles.modalTitle}>
+                  {isEditing ? 'Edit Investment' : 'Add Investment'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                >
+                  <Ionicons name="close" size={24} color={Colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -281,19 +334,18 @@ export default function InvestmentsScreen() {
 
               <Text style={styles.inputLabel}>Type</Text>
               <View style={styles.typeGrid}>
-                {investmentTypes.map(t => (
+                {investmentTypes.map((t) => (
                   <TouchableOpacity
                     key={t.value}
-                    style={[
-                      styles.typeChip,
-                      type === t.value && styles.typeChipActive
-                    ]}
+                    style={[styles.typeChip, type === t.value && styles.typeChipActive]}
                     onPress={() => setType(t.value)}
                   >
-                    <Text style={[
-                      styles.typeChipText,
-                      type === t.value && styles.typeChipTextActive
-                    ]}>
+                    <Text
+                      style={[
+                        styles.typeChipText,
+                        type === t.value && styles.typeChipTextActive,
+                      ]}
+                    >
                       {t.label}
                     </Text>
                   </TouchableOpacity>
@@ -341,7 +393,9 @@ export default function InvestmentsScreen() {
               />
 
               <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                <Text style={styles.submitButtonText}>{isEditing ? 'Save Changes' : 'Add Investment'}</Text>
+                <Text style={styles.submitButtonText}>
+                  {isEditing ? 'Save Changes' : 'Add Investment'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

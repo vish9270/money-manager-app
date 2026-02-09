@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Text, Switch, TouchableOpacity } from 'react-native';
 import { Stack } from 'expo-router';
-import { Lock, Fingerprint, Eye, Key } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 
 export default function SecurityScreen() {
@@ -12,14 +12,14 @@ export default function SecurityScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Security' }} />
-      
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>App Lock</Text>
-        
+
         <View style={styles.settingsList}>
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Lock size={20} color={Colors.chart.blue} />
+              <Ionicons name="lock-closed-outline" size={20} color={Colors.chart.blue} />
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>PIN Lock</Text>
@@ -32,10 +32,10 @@ export default function SecurityScreen() {
               thumbColor={pinEnabled ? Colors.accent : Colors.textMuted}
             />
           </View>
-          
+
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Fingerprint size={20} color={Colors.chart.purple} />
+              <Ionicons name="finger-print-outline" size={20} color={Colors.chart.purple} />
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Biometric Lock</Text>
@@ -53,11 +53,11 @@ export default function SecurityScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Privacy</Text>
-        
+
         <View style={styles.settingsList}>
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Eye size={20} color={Colors.chart.green} />
+              <Ionicons name="eye-outline" size={20} color={Colors.chart.green} />
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Hide Balances</Text>
@@ -75,11 +75,11 @@ export default function SecurityScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Data</Text>
-        
+
         <View style={styles.settingsList}>
           <TouchableOpacity style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Key size={20} color={Colors.chart.orange} />
+              <Ionicons name="key-outline" size={20} color={Colors.chart.orange} />
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Export Data</Text>

@@ -1,10 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { 
-  Target, Repeat, PiggyBank, CreditCard, FileText, Settings,
-  ChevronRight, Bell, Shield, Download, HelpCircle
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useMoney } from '@/providers/MoneyProvider';
@@ -20,8 +17,8 @@ interface MenuItemProps {
 
 function MenuItem({ icon, title, subtitle, value, onPress }: MenuItemProps) {
   return (
-    <TouchableOpacity 
-      style={styles.menuItem} 
+    <TouchableOpacity
+      style={styles.menuItem}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
@@ -34,7 +31,7 @@ function MenuItem({ icon, title, subtitle, value, onPress }: MenuItemProps) {
         {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
       </View>
       {value && <Text style={styles.menuValue}>{value}</Text>}
-      <ChevronRight size={18} color={Colors.textMuted} />
+      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
     </TouchableOpacity>
   );
 }
@@ -52,26 +49,26 @@ export default function MoreScreen() {
         <Text style={styles.sectionTitle}>Financial Tools</Text>
         <View style={styles.menuGroup}>
           <MenuItem
-            icon={<Target size={20} color={Colors.chart.purple} />}
+            icon={<Ionicons name="flag-outline" size={20} color={Colors.chart.purple} />}
             title="Goals"
             subtitle={`${activeGoals} active goals`}
             onPress={() => router.push('/goals')}
           />
           <MenuItem
-            icon={<Repeat size={20} color={Colors.chart.blue} />}
+            icon={<Ionicons name="repeat-outline" size={20} color={Colors.chart.blue} />}
             title="Recurring"
             subtitle={`${activeRecurring} active items`}
             onPress={() => router.push('/recurring')}
           />
           <MenuItem
-            icon={<PiggyBank size={20} color={Colors.chart.green} />}
+            icon={<Ionicons name="wallet-outline" size={20} color={Colors.chart.green} />}
             title="Investments"
             subtitle={`${investments.length} investments`}
             value={formatCurrency(getTotalInvestmentValue)}
             onPress={() => router.push('/investments')}
           />
           <MenuItem
-            icon={<CreditCard size={20} color={Colors.chart.red} />}
+            icon={<Ionicons name="card-outline" size={20} color={Colors.chart.red} />}
             title="Debts & Loans"
             subtitle={`${debts.length} active debts`}
             value={formatCurrency(getTotalDebtOutstanding)}
@@ -84,13 +81,13 @@ export default function MoreScreen() {
         <Text style={styles.sectionTitle}>Data & Reports</Text>
         <View style={styles.menuGroup}>
           <MenuItem
-            icon={<FileText size={20} color={Colors.chart.teal} />}
+            icon={<Ionicons name="document-text-outline" size={20} color={Colors.chart.teal} />}
             title="Reports"
             subtitle="Monthly & yearly reports"
             onPress={() => router.push('/reports')}
           />
           <MenuItem
-            icon={<Download size={20} color={Colors.chart.orange} />}
+            icon={<Ionicons name="download-outline" size={20} color={Colors.chart.orange} />}
             title="Import CSV"
             subtitle="Import bank statements"
             onPress={() => router.push('/import')}
@@ -102,25 +99,25 @@ export default function MoreScreen() {
         <Text style={styles.sectionTitle}>App Settings</Text>
         <View style={styles.menuGroup}>
           <MenuItem
-            icon={<Bell size={20} color={Colors.chart.yellow} />}
+            icon={<Ionicons name="notifications-outline" size={20} color={Colors.chart.yellow} />}
             title="Notifications"
             subtitle="Alerts & reminders"
             onPress={() => router.push('/notifications')}
           />
           <MenuItem
-            icon={<Shield size={20} color={Colors.chart.pink} />}
+            icon={<Ionicons name="shield-checkmark-outline" size={20} color={Colors.chart.pink} />}
             title="Security"
             subtitle="PIN & biometrics"
             onPress={() => router.push('/security')}
           />
           <MenuItem
-            icon={<Settings size={20} color={Colors.textSecondary} />}
+            icon={<Ionicons name="settings-outline" size={20} color={Colors.textSecondary} />}
             title="Settings"
             subtitle="Categories, accounts"
             onPress={() => router.push('/settings')}
           />
           <MenuItem
-            icon={<HelpCircle size={20} color={Colors.chart.blue} />}
+            icon={<Ionicons name="help-circle-outline" size={20} color={Colors.chart.blue} />}
             title="Help & Support"
             onPress={() => {}}
           />

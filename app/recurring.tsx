@@ -1,7 +1,18 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Stack } from 'expo-router';
-import { Plus, X, Repeat, Calendar, Edit2, Trash2 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
@@ -11,12 +22,20 @@ import RecurringItem from '@/components/RecurringItem';
 import SearchablePicker from '@/components/SearchablePicker';
 
 export default function RecurringScreen() {
-  const { recurring, categories, accounts, addRecurring, updateRecurring, deleteRecurring, getCategoryById } = useMoney();
-  
+  const {
+    recurring,
+    categories,
+    accounts,
+    addRecurring,
+    updateRecurring,
+    deleteRecurring,
+    getCategoryById,
+  } = useMoney();
+
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingItem, setEditingItem] = useState<Recurring | null>(null);
-  
+
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<TransactionType>('expense');
@@ -27,12 +46,18 @@ export default function RecurringScreen() {
   const [selectedToAccountId, setSelectedToAccountId] = useState('');
   const [notes, setNotes] = useState('');
 
-  const activeRecurring = useMemo(() => recurring.filter(r => r.isActive), [recurring]);
-  const inactiveRecurring = useMemo(() => recurring.filter(r => !r.isActive), [recurring]);
+  const activeRecurring = useMemo(
+    () => recurring.filter((r) => r.isActive),
+    [recurring]
+  );
+  const inactiveRecurring = useMemo(
+    () => recurring.filter((r) => !r.isActive),
+    [recurring]
+  );
 
   const monthlyTotal = useMemo(() => {
     return activeRecurring
-      .filter(r => r.type === 'expense')
+      .filter((r) => r.type === 'expense')
       .reduce((sum, r) => {
         let monthlyAmount = r.amount;
         if (r.frequency === 'quarterly') monthlyAmount /= 3;
@@ -43,18 +68,20 @@ export default function RecurringScreen() {
   }, [activeRecurring]);
 
   const filteredCategories = useMemo(() => {
-    if (type === 'income') return categories.filter(c => c.type === 'income' || c.type === 'both');
-    if (type === 'expense') return categories.filter(c => c.type === 'expense' || c.type === 'both');
+    if (type === 'income')
+      return categories.filter((c) => c.type === 'income' || c.type === 'both');
+    if (type === 'expense')
+      return categories.filter((c) => c.type === 'expense' || c.type === 'both');
     return categories;
   }, [type, categories]);
 
-  const categoryItems = useMemo(() => 
-    filteredCategories.map(c => ({ id: c.id, name: c.name, color: c.color })),
+  const categoryItems = useMemo(
+    () => filteredCategories.map((c) => ({ id: c.id, name: c.name, color: c.color })),
     [filteredCategories]
   );
 
-  const accountItems = useMemo(() => 
-    accounts.map(a => ({ id: a.id, name: a.name, color: a.color })),
+  const accountItems = useMemo(
+    () => accounts.map((a) => ({ id: a.id, name: a.name, color: a.color })),
     [accounts]
   );
 
@@ -148,43 +175,45 @@ export default function RecurringScreen() {
     resetForm();
   };
 
-  const handleDelete = useCallback((item: Recurring) => {
-    Alert.alert(
-      'Delete Recurring',
-      `Are you sure you want to delete "${item.name}"? Future runs will be stopped.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteRecurring(item.id);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        }
-      ]
-    );
-  }, [deleteRecurring]);
+  const handleDelete = useCallback(
+    (item: Recurring) => {
+      Alert.alert(
+        'Delete Recurring',
+        `Are you sure you want to delete "${item.name}"? Future runs will be stopped.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              deleteRecurring(item.id);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            },
+          },
+        ]
+      );
+    },
+    [deleteRecurring]
+  );
 
   const handleToggle = (id: string, isActive: boolean) => {
-    const item = recurring.find(r => r.id === id);
+    const item = recurring.find((r) => r.id === id);
     if (item) {
       updateRecurring({ ...item, isActive });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
-  const handleItemPress = useCallback((item: Recurring) => {
-    Alert.alert(
-      item.name,
-      'What would you like to do?',
-      [
+  const handleItemPress = useCallback(
+    (item: Recurring) => {
+      Alert.alert(item.name, 'What would you like to do?', [
         { text: 'Edit', onPress: () => openEditModal(item) },
         { text: 'Delete', style: 'destructive', onPress: () => handleDelete(item) },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  }, [openEditModal, handleDelete]);
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [openEditModal, handleDelete]
+  );
 
   const typeButtons: { type: TransactionType; label: string; color: string }[] = [
     { type: 'expense', label: 'Expense', color: Colors.expense },
@@ -202,10 +231,10 @@ export default function RecurringScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Recurring' }} />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.summaryCard}>
-          <Repeat size={24} color={Colors.accent} />
+          <Ionicons name="repeat" size={24} color={Colors.accent} />
           <View style={styles.summaryContent}>
             <Text style={styles.summaryLabel}>Monthly Recurring Expenses</Text>
             <Text style={styles.summaryValue}>{formatCurrency(monthlyTotal)}</Text>
@@ -219,7 +248,7 @@ export default function RecurringScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Active ({activeRecurring.length})</Text>
             <View style={styles.recurringList}>
-              {activeRecurring.map(item => (
+              {activeRecurring.map((item) => (
                 <TouchableOpacity key={item.id} onPress={() => handleItemPress(item)}>
                   <RecurringItem
                     item={item}
@@ -234,9 +263,11 @@ export default function RecurringScreen() {
 
         {inactiveRecurring.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Inactive ({inactiveRecurring.length})</Text>
+            <Text style={styles.sectionTitle}>
+              Inactive ({inactiveRecurring.length})
+            </Text>
             <View style={styles.recurringList}>
-              {inactiveRecurring.map(item => (
+              {inactiveRecurring.map((item) => (
                 <TouchableOpacity key={item.id} onPress={() => handleItemPress(item)}>
                   <RecurringItem
                     item={item}
@@ -251,16 +282,18 @@ export default function RecurringScreen() {
 
         {recurring.length === 0 && (
           <View style={styles.emptyState}>
-            <Calendar size={48} color={Colors.textMuted} />
+            <Ionicons name="calendar-outline" size={48} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No recurring items</Text>
-            <Text style={styles.emptySubtitle}>Add recurring transactions like salary, EMIs, or subscriptions</Text>
+            <Text style={styles.emptySubtitle}>
+              Add recurring transactions like salary, EMIs, or subscriptions
+            </Text>
           </View>
         )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -268,38 +301,47 @@ export default function RecurringScreen() {
           setShowModal(true);
         }}
       >
-        <Plus size={24} color={Colors.textInverse} />
+        <Ionicons name="add" size={24} color={Colors.textInverse} />
       </TouchableOpacity>
 
       <Modal visible={showModal} animationType="slide" transparent>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{isEditing ? 'Edit Recurring' : 'New Recurring'}</Text>
-                <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
-                  <X size={24} color={Colors.textSecondary} />
+                <Text style={styles.modalTitle}>
+                  {isEditing ? 'Edit Recurring' : 'New Recurring'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                >
+                  <Ionicons name="close" size={24} color={Colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <Text style={styles.inputLabel}>Type</Text>
               <View style={styles.typeButtons}>
-                {typeButtons.map(btn => (
+                {typeButtons.map((btn) => (
                   <TouchableOpacity
                     key={btn.type}
                     style={[
                       styles.typeButton,
-                      type === btn.type && { backgroundColor: btn.color }
+                      type === btn.type && { backgroundColor: btn.color },
                     ]}
                     onPress={() => setType(btn.type)}
                   >
-                    <Text style={[
-                      styles.typeButtonText,
-                      type === btn.type && styles.typeButtonTextActive
-                    ]}>
+                    <Text
+                      style={[
+                        styles.typeButtonText,
+                        type === btn.type && styles.typeButtonTextActive,
+                      ]}
+                    >
                       {btn.label}
                     </Text>
                   </TouchableOpacity>
@@ -327,19 +369,21 @@ export default function RecurringScreen() {
 
               <Text style={styles.inputLabel}>Frequency</Text>
               <View style={styles.frequencyButtons}>
-                {frequencyButtons.map(btn => (
+                {frequencyButtons.map((btn) => (
                   <TouchableOpacity
                     key={btn.freq}
                     style={[
                       styles.frequencyButton,
-                      frequency === btn.freq && styles.frequencyButtonActive
+                      frequency === btn.freq && styles.frequencyButtonActive,
                     ]}
                     onPress={() => setFrequency(btn.freq)}
                   >
-                    <Text style={[
-                      styles.frequencyButtonText,
-                      frequency === btn.freq && styles.frequencyButtonTextActive
-                    ]}>
+                    <Text
+                      style={[
+                        styles.frequencyButtonText,
+                        frequency === btn.freq && styles.frequencyButtonTextActive,
+                      ]}
+                    >
                       {btn.label}
                     </Text>
                   </TouchableOpacity>
@@ -404,7 +448,9 @@ export default function RecurringScreen() {
               />
 
               <TouchableOpacity style={styles.addButton} onPress={handleSubmit}>
-                <Text style={styles.addButtonText}>{isEditing ? 'Save Changes' : 'Add Recurring'}</Text>
+                <Text style={styles.addButtonText}>
+                  {isEditing ? 'Save Changes' : 'Add Recurring'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

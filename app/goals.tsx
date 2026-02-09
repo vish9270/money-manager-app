@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import { Stack } from 'expo-router';
-import { Plus, X, Target, Shield, Car, Plane, Home, GraduationCap, Gift, Sparkles } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
@@ -10,14 +10,14 @@ import GoalCard from '@/components/GoalCard';
 import { GoalStatus } from '@/types';
 
 const iconOptions = [
-  { icon: 'Shield', component: Shield, label: 'Emergency' },
-  { icon: 'Car', component: Car, label: 'Vehicle' },
-  { icon: 'Plane', component: Plane, label: 'Travel' },
-  { icon: 'Home', component: Home, label: 'Home' },
-  { icon: 'GraduationCap', component: GraduationCap, label: 'Education' },
-  { icon: 'Gift', component: Gift, label: 'Gift' },
-  { icon: 'Sparkles', component: Sparkles, label: 'Other' },
-  { icon: 'Target', component: Target, label: 'Target' },
+  { icon: 'Shield', ionName: 'shield-outline', label: 'Emergency' },
+  { icon: 'Car', ionName: 'car-outline', label: 'Vehicle' },
+  { icon: 'Plane', ionName: 'airplane-outline', label: 'Travel' },
+  { icon: 'Home', ionName: 'home-outline', label: 'Home' },
+  { icon: 'GraduationCap', ionName: 'school-outline', label: 'Education' },
+  { icon: 'Gift', ionName: 'gift-outline', label: 'Gift' },
+  { icon: 'Sparkles', ionName: 'sparkles-outline', label: 'Other' },
+  { icon: 'Target', ionName: 'flag-outline', label: 'Target' },
 ];
 
 const colorOptions = [
@@ -33,7 +33,7 @@ const colorOptions = [
 
 export default function GoalsScreen() {
   const { goals, addGoal, updateGoal } = useMoney();
-  
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [goalName, setGoalName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
@@ -43,10 +43,8 @@ export default function GoalsScreen() {
   const activeGoals = useMemo(() => goals.filter(g => g.status === 'active'), [goals]);
   const completedGoals = useMemo(() => goals.filter(g => g.status === 'completed'), [goals]);
 
-  const totalTargetAmount = useMemo(() => 
-    activeGoals.reduce((sum, g) => sum + g.targetAmount, 0), [activeGoals]);
-  const totalSavedAmount = useMemo(() => 
-    activeGoals.reduce((sum, g) => sum + g.savedAmount, 0), [activeGoals]);
+  const totalTargetAmount = useMemo(() => activeGoals.reduce((sum, g) => sum + g.targetAmount, 0), [activeGoals]);
+  const totalSavedAmount = useMemo(() => activeGoals.reduce((sum, g) => sum + g.savedAmount, 0), [activeGoals]);
 
   const handleAddGoal = () => {
     if (!goalName.trim() || !targetAmount) {
@@ -108,7 +106,7 @@ export default function GoalsScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Goals' }} />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
@@ -124,11 +122,11 @@ export default function GoalsScreen() {
           </View>
           <View style={styles.overallProgress}>
             <View style={styles.progressBar}>
-              <View 
+              <View
                 style={[
-                  styles.progressFill, 
-                  { width: `${calculateProgress(totalSavedAmount, totalTargetAmount)}%` }
-                ]} 
+                  styles.progressFill,
+                  { width: `${calculateProgress(totalSavedAmount, totalTargetAmount)}%` },
+                ]}
               />
             </View>
             <Text style={styles.progressText}>
@@ -142,25 +140,21 @@ export default function GoalsScreen() {
             <Text style={styles.sectionTitle}>Active Goals ({activeGoals.length})</Text>
             <View style={styles.goalsList}>
               {activeGoals.map(goal => (
-                <GoalCard 
-                  key={goal.id} 
+                <GoalCard
+                  key={goal.id}
                   goal={goal}
                   onPress={() => {
-                    Alert.alert(
-                      'Add Contribution',
-                      `Add a contribution to "${goal.name}"`,
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        { 
-                          text: 'Add ₹1,000', 
-                          onPress: () => handleContribute(goal.id, 1000)
-                        },
-                        { 
-                          text: 'Add ₹5,000', 
-                          onPress: () => handleContribute(goal.id, 5000)
-                        }
-                      ]
-                    );
+                    Alert.alert('Add Contribution', `Add a contribution to "${goal.name}"`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Add ₹1,000',
+                        onPress: () => handleContribute(goal.id, 1000),
+                      },
+                      {
+                        text: 'Add ₹5,000',
+                        onPress: () => handleContribute(goal.id, 5000),
+                      },
+                    ]);
                   }}
                 />
               ))}
@@ -181,7 +175,7 @@ export default function GoalsScreen() {
 
         {goals.length === 0 && (
           <View style={styles.emptyState}>
-            <Target size={48} color={Colors.textMuted} />
+            <Ionicons name="flag-outline" size={48} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No goals yet</Text>
             <Text style={styles.emptySubtitle}>Create your first financial goal to start saving</Text>
           </View>
@@ -190,14 +184,14 @@ export default function GoalsScreen() {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           setShowAddModal(true);
         }}
       >
-        <Plus size={24} color={Colors.textInverse} />
+        <Ionicons name="add" size={24} color={Colors.textInverse} />
       </TouchableOpacity>
 
       <Modal visible={showAddModal} animationType="slide" transparent>
@@ -206,7 +200,7 @@ export default function GoalsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Goal</Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <X size={24} color={Colors.textSecondary} />
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -231,21 +225,22 @@ export default function GoalsScreen() {
 
             <Text style={styles.inputLabel}>Icon</Text>
             <View style={styles.iconGrid}>
-              {iconOptions.map(opt => {
-                const IconComp = opt.component;
-                return (
-                  <TouchableOpacity
-                    key={opt.icon}
-                    style={[
-                      styles.iconOption,
-                      selectedIcon === opt.icon && { backgroundColor: selectedColor + '30' }
-                    ]}
-                    onPress={() => setSelectedIcon(opt.icon)}
-                  >
-                    <IconComp size={20} color={selectedIcon === opt.icon ? selectedColor : Colors.textSecondary} />
-                  </TouchableOpacity>
-                );
-              })}
+              {iconOptions.map(opt => (
+                <TouchableOpacity
+                  key={opt.icon}
+                  style={[
+                    styles.iconOption,
+                    selectedIcon === opt.icon && { backgroundColor: selectedColor + '30' },
+                  ]}
+                  onPress={() => setSelectedIcon(opt.icon)}
+                >
+                  <Ionicons
+                    name={opt.ionName as any}
+                    size={20}
+                    color={selectedIcon === opt.icon ? selectedColor : Colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              ))}
             </View>
 
             <Text style={styles.inputLabel}>Color</Text>
@@ -256,7 +251,7 @@ export default function GoalsScreen() {
                   style={[
                     styles.colorOption,
                     { backgroundColor: color },
-                    selectedColor === color && styles.colorOptionSelected
+                    selectedColor === color && styles.colorOptionSelected,
                   ]}
                   onPress={() => setSelectedColor(color)}
                 />

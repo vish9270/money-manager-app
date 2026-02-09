@@ -1,14 +1,18 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { 
-  Building2, PiggyBank, Banknote, CreditCard, Landmark, Wallet, TrendingUp
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 import { Account } from '@/types';
 import { formatFullCurrency } from '@/utils/helpers';
 
-const iconMap: Record<string, React.ComponentType<{ size: number; color: string }>> = {
-  Building2, PiggyBank, Banknote, CreditCard, Landmark, Wallet, TrendingUp,
+const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
+  Building2: 'business-outline',
+  PiggyBank: 'cash-outline',
+  Banknote: 'cash-outline',
+  CreditCard: 'card-outline',
+  Landmark: 'library-outline',
+  Wallet: 'wallet-outline',
+  TrendingUp: 'trending-up-outline',
 };
 
 interface AccountCardProps {
@@ -17,40 +21,40 @@ interface AccountCardProps {
 }
 
 export default function AccountCard({ account, onPress }: AccountCardProps) {
-  const IconComponent = iconMap[account.icon] || Wallet;
+  const iconName = iconMap[account.icon] || 'wallet-outline';
+
   const isCreditCard = account.type === 'credit_card';
   const displayBalance = isCreditCard ? Math.abs(account.balance) : account.balance;
   const balanceLabel = isCreditCard ? 'Outstanding' : 'Balance';
-  
+
   return (
-    <TouchableOpacity 
-      style={[styles.container, { borderLeftColor: account.color }]} 
+    <TouchableOpacity
+      style={[styles.container, { borderLeftColor: account.color }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={styles.header}>
         <View style={[styles.iconContainer, { backgroundColor: account.color + '20' }]}>
-          <IconComponent size={20} color={account.color} />
+          <Ionicons name={iconName} size={20} color={account.color} />
         </View>
+
         <View style={styles.headerText}>
           <Text style={styles.name}>{account.name}</Text>
           <Text style={styles.type}>{account.type.replace('_', ' ').toUpperCase()}</Text>
         </View>
       </View>
+
       <View style={styles.balanceContainer}>
         <Text style={styles.balanceLabel}>{balanceLabel}</Text>
-        <Text style={[
-          styles.balance, 
-          isCreditCard && account.balance < 0 && styles.negativeBalance
-        ]}>
-          {isCreditCard && account.balance < 0 ? '-' : ''}{formatFullCurrency(displayBalance)}
+        <Text style={[styles.balance, isCreditCard && account.balance < 0 && styles.negativeBalance]}>
+          {isCreditCard && account.balance < 0 ? '-' : ''}
+          {formatFullCurrency(displayBalance)}
         </Text>
       </View>
+
       {isCreditCard && account.creditLimit && (
         <View style={styles.limitContainer}>
-          <Text style={styles.limitText}>
-            Limit: {formatFullCurrency(account.creditLimit)}
-          </Text>
+          <Text style={styles.limitText}>Limit: {formatFullCurrency(account.creditLimit)}</Text>
           <Text style={styles.availableText}>
             Available: {formatFullCurrency(account.creditLimit + account.balance)}
           </Text>

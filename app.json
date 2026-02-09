@@ -22,7 +22,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.money_manager_app_e8g089o"
+      "package": "com.wishvesh.moneymanager"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -39,6 +39,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://rork.com/"
+      },
+      "eas": {
+        "projectId": "128ac614-dbfc-4aef-8820-e8fd1cca20cb"
+      }
     }
   }
 }

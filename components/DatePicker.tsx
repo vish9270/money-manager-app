@@ -9,7 +9,7 @@ import {
   Pressable,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 
 interface DatePickerProps {
@@ -74,25 +74,28 @@ export default function DatePicker({
     }
   }, [onDateChange]);
 
-  const adjustDay = useCallback((days: number) => {
-    const newDate = new Date(tempDate);
-    newDate.setDate(newDate.getDate() + days);
-    
-    if (maximumDate && newDate > maximumDate) return;
-    if (minimumDate && newDate < minimumDate) return;
-    
-    setTempDate(newDate);
-    if (Platform.OS === 'android') {
-      onDateChange(newDate);
-    }
-  }, [tempDate, maximumDate, minimumDate, onDateChange]);
+  const adjustDay = useCallback(
+    (days: number) => {
+      const newDate = new Date(tempDate);
+      newDate.setDate(newDate.getDate() + days);
+
+      if (maximumDate && newDate > maximumDate) return;
+      if (minimumDate && newDate < minimumDate) return;
+
+      setTempDate(newDate);
+      if (Platform.OS === 'android') {
+        onDateChange(newDate);
+      }
+    },
+    [tempDate, maximumDate, minimumDate, onDateChange]
+  );
 
   if (Platform.OS === 'web') {
     return (
       <View>
         {label && <Text style={styles.label}>{label}</Text>}
         <View style={styles.selector}>
-          <Calendar size={18} color={Colors.textSecondary} />
+          <Ionicons name="calendar-outline" size={18} color={Colors.textSecondary} />
           <input
             type="date"
             value={date.toISOString().split('T')[0]}
@@ -119,12 +122,13 @@ export default function DatePicker({
   return (
     <View>
       {label && <Text style={styles.label}>{label}</Text>}
+
       <TouchableOpacity
         style={styles.selector}
         onPress={() => setShowPicker(true)}
         activeOpacity={0.7}
       >
-        <Calendar size={18} color={Colors.textSecondary} />
+        <Ionicons name="calendar-outline" size={18} color={Colors.textSecondary} />
         <Text style={styles.dateText}>{formatDate(date)}</Text>
       </TouchableOpacity>
 
@@ -146,34 +150,35 @@ export default function DatePicker({
           animationType="slide"
           onRequestClose={handleCancel}
         >
-          <Pressable style={styles.overlay} onPress={handleCancel}>
+          <View style={styles.overlay}>
+            {/* Tap outside to close */}
+            <Pressable style={StyleSheet.absoluteFill} onPress={handleCancel} />
+
+            {/* Modal content */}
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={handleCancel}>
                   <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity onPress={goToToday}>
                   <Text style={styles.todayText}>Today</Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity onPress={handleConfirm}>
                   <Text style={styles.confirmText}>Done</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.quickNav}>
-                <TouchableOpacity
-                  style={styles.navButton}
-                  onPress={() => adjustDay(-1)}
-                >
-                  <ChevronLeft size={20} color={Colors.accent} />
+                <TouchableOpacity style={styles.navButton} onPress={() => adjustDay(-1)}>
+                  <Ionicons name="chevron-back" size={20} color={Colors.accent} />
                   <Text style={styles.navText}>Previous</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.navButton}
-                  onPress={() => adjustDay(1)}
-                >
+
+                <TouchableOpacity style={styles.navButton} onPress={() => adjustDay(1)}>
                   <Text style={styles.navText}>Next</Text>
-                  <ChevronRight size={20} color={Colors.accent} />
+                  <Ionicons name="chevron-forward" size={20} color={Colors.accent} />
                 </TouchableOpacity>
               </View>
 
@@ -187,7 +192,7 @@ export default function DatePicker({
                 style={styles.picker}
               />
             </View>
-          </Pressable>
+          </View>
         </Modal>
       )}
     </View>

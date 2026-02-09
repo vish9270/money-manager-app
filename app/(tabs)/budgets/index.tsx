@@ -1,7 +1,18 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, TrendingUp, TrendingDown, Wallet, X, Edit2, Trash2 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
@@ -20,13 +31,28 @@ const accountTypes: { value: AccountType; label: string }[] = [
 ];
 
 const accountColors = [
-  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
-  '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
+  '#3B82F6',
+  '#10B981',
+  '#F59E0B',
+  '#EF4444',
+  '#8B5CF6',
+  '#EC4899',
+  '#06B6D4',
+  '#84CC16',
+  '#F97316',
+  '#6366F1',
 ];
 
 export default function AccountsScreen() {
   const router = useRouter();
-  const { accounts, addAccount, updateAccount, deleteAccount, checkAccountHasTransactions, getTotalNetWorth } = useMoney();
+  const {
+    accounts,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    checkAccountHasTransactions,
+    getTotalNetWorth,
+  } = useMoney();
 
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -115,22 +141,20 @@ export default function AccountsScreen() {
     resetForm();
   };
 
-  const handleDelete = useCallback((account: Account) => {
-    const hasTransactions = checkAccountHasTransactions(account.id);
-    
-    if (hasTransactions) {
-      Alert.alert(
-        'Cannot Delete',
-        'This account has transactions associated with it. Please delete or reassign those transactions first.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+  const handleDelete = useCallback(
+    (account: Account) => {
+      const hasTransactions = checkAccountHasTransactions(account.id);
 
-    Alert.alert(
-      'Delete Account',
-      `Are you sure you want to delete "${account.name}"?`,
-      [
+      if (hasTransactions) {
+        Alert.alert(
+          'Cannot Delete',
+          'This account has transactions associated with it. Please delete or reassign those transactions first.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      Alert.alert('Delete Account', `Are you sure you want to delete "${account.name}"?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -138,47 +162,43 @@ export default function AccountsScreen() {
           onPress: () => {
             deleteAccount(account.id);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        }
-      ]
-    );
-  }, [deleteAccount, checkAccountHasTransactions]);
+          },
+        },
+      ]);
+    },
+    [deleteAccount, checkAccountHasTransactions]
+  );
 
-  const handleAccountPress = useCallback((account: Account) => {
-    Alert.alert(
-      account.name,
-      'What would you like to do?',
-      [
+  const handleAccountPress = useCallback(
+    (account: Account) => {
+      Alert.alert(account.name, 'What would you like to do?', [
         { text: 'Edit', onPress: () => openEditModal(account) },
         { text: 'Delete', style: 'destructive', onPress: () => handleDelete(account) },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  }, [openEditModal, handleDelete]);
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [openEditModal, handleDelete]
+  );
 
   const renderAccountGroup = (title: string, accountsList: typeof accounts) => {
     if (accountsList.length === 0) return null;
-    
+
     const groupTotal = accountsList.reduce((sum, a) => sum + a.balance, 0);
-    
+
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={[
-            styles.sectionTotal,
-            groupTotal < 0 && styles.negativeTotalText
-          ]}>
-            {groupTotal < 0 ? '-' : ''}{formatCurrency(Math.abs(groupTotal))}
+          <Text style={[styles.sectionTotal, groupTotal < 0 && styles.negativeTotalText]}>
+            {groupTotal < 0 ? '-' : ''}
+            {formatCurrency(Math.abs(groupTotal))}
           </Text>
         </View>
+
         <View style={styles.accountsList}>
           {accountsList.map(account => (
             <TouchableOpacity key={account.id} onPress={() => handleAccountPress(account)}>
-              <AccountCard 
-                account={account}
-                onPress={() => handleAccountPress(account)}
-              />
+              <AccountCard account={account} onPress={() => handleAccountPress(account)} />
             </TouchableOpacity>
           ))}
         </View>
@@ -191,24 +211,22 @@ export default function AccountsScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.summarySection}>
           <View style={styles.netWorthCard}>
-            <Wallet size={20} color={Colors.accent} />
+            <Ionicons name="wallet-outline" size={20} color={Colors.accent} />
             <Text style={styles.netWorthLabel}>Net Worth</Text>
-            <Text style={[
-              styles.netWorthValue,
-              getTotalNetWorth < 0 && styles.negativeValue
-            ]}>
+            <Text style={[styles.netWorthValue, getTotalNetWorth < 0 && styles.negativeValue]}>
               {formatFullCurrency(getTotalNetWorth)}
             </Text>
           </View>
-          
+
           <View style={styles.summaryRow}>
             <View style={styles.summaryCard}>
-              <TrendingUp size={16} color={Colors.income} />
+              <Ionicons name="trending-up-outline" size={16} color={Colors.income} />
               <Text style={styles.summaryLabel}>Assets</Text>
               <Text style={styles.summaryValue}>{formatCurrency(totalAssets)}</Text>
             </View>
+
             <View style={styles.summaryCard}>
-              <TrendingDown size={16} color={Colors.expense} />
+              <Ionicons name="trending-down-outline" size={16} color={Colors.expense} />
               <Text style={styles.summaryLabel}>Liabilities</Text>
               <Text style={[styles.summaryValue, styles.liabilityValue]}>
                 {formatCurrency(totalLiabilities)}
@@ -228,7 +246,7 @@ export default function AccountsScreen() {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -236,11 +254,11 @@ export default function AccountsScreen() {
           setShowModal(true);
         }}
       >
-        <Plus size={24} color={Colors.textInverse} />
+        <Ionicons name="add" size={26} color={Colors.textInverse} />
       </TouchableOpacity>
 
       <Modal visible={showModal} animationType="slide" transparent>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
@@ -248,8 +266,13 @@ export default function AccountsScreen() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>{isEditing ? 'Edit Account' : 'Add Account'}</Text>
-                <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
-                  <X size={24} color={Colors.textSecondary} />
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                >
+                  <Ionicons name="close" size={26} color={Colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -267,16 +290,10 @@ export default function AccountsScreen() {
                 {accountTypes.map(t => (
                   <TouchableOpacity
                     key={t.value}
-                    style={[
-                      styles.typeChip,
-                      type === t.value && styles.typeChipActive
-                    ]}
+                    style={[styles.typeChip, type === t.value && styles.typeChipActive]}
                     onPress={() => setType(t.value)}
                   >
-                    <Text style={[
-                      styles.typeChipText,
-                      type === t.value && styles.typeChipTextActive
-                    ]}>
+                    <Text style={[styles.typeChipText, type === t.value && styles.typeChipTextActive]}>
                       {t.label}
                     </Text>
                   </TouchableOpacity>
@@ -318,7 +335,7 @@ export default function AccountsScreen() {
                     style={[
                       styles.colorChip,
                       { backgroundColor: color },
-                      selectedColor === color && styles.colorChipSelected
+                      selectedColor === color && styles.colorChipSelected,
                     ]}
                     onPress={() => setSelectedColor(color)}
                   />
@@ -326,7 +343,9 @@ export default function AccountsScreen() {
               </View>
 
               <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                <Text style={styles.submitButtonText}>{isEditing ? 'Save Changes' : 'Add Account'}</Text>
+                <Text style={styles.submitButtonText}>
+                  {isEditing ? 'Save Changes' : 'Add Account'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

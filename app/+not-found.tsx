@@ -1,6 +1,6 @@
 import { Link, Stack } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
-import { CircleAlert } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 
 export default function NotFoundScreen() {
@@ -8,7 +8,7 @@ export default function NotFoundScreen() {
     <>
       <Stack.Screen options={{ title: 'Not Found' }} />
       <View style={styles.container}>
-        <CircleAlert size={64} color={Colors.textMuted} />
+        <Ionicons name="alert-circle-outline" size={64} color={Colors.textMuted} />
         <Text style={styles.title}>Page Not Found</Text>
         <Text style={styles.subtitle}>The page you're looking for doesn't exist.</Text>
         <Link href="/" style={styles.link}>
