@@ -68,7 +68,7 @@ export default function MoreScreen() {
             title="Investments"
             subtitle={`${investments.length} investments`}
             value={formatCurrency(getTotalInvestmentValue)}
-            onPress={() => router.push('/investments')}
+            onPress={() => router.push('/investment')}
           />
           <MenuItem
             icon={<CreditCard size={20} color={Colors.chart.red} />}
