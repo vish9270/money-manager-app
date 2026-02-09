@@ -1,7 +1,18 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { ChevronRight, Palette, Tag, Shield, Bell, FileText, Download, X, Plus, Edit2, Trash2 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -10,24 +21,43 @@ import { useMoney } from '@/providers/MoneyProvider';
 import { Category } from '@/types';
 
 const categoryColors = [
-  '#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6',
-  '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1',
-  '#14B8A6', '#A855F7', '#F472B6', '#0EA5E9', '#7C3AED'
+  '#10B981',
+  '#3B82F6',
+  '#F59E0B',
+  '#EF4444',
+  '#8B5CF6',
+  '#EC4899',
+  '#06B6D4',
+  '#84CC16',
+  '#F97316',
+  '#6366F1',
+  '#14B8A6',
+  '#A855F7',
+  '#F472B6',
+  '#0EA5E9',
+  '#7C3AED',
 ];
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { 
-    categories, transactions, accounts, 
-    addCategory, updateCategory, deleteCategory, 
-    checkCategoryHasTransactions, getCategoryById, getAccountById
+  const {
+    categories,
+    transactions,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    checkCategoryHasTransactions,
+    getCategoryById,
+    getAccountById,
   } = useMoney();
 
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [isEditingCategory, setIsEditingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
-  const [categoryType, setCategoryType] = useState<'income' | 'expense' | 'both'>('expense');
+  const [categoryType, setCategoryType] = useState<'income' | 'expense' | 'both'>(
+    'expense'
+  );
   const [categoryColor, setCategoryColor] = useState(categoryColors[0]);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -76,27 +106,25 @@ export default function SettingsScreen() {
     resetCategoryForm();
   };
 
-  const handleDeleteCategory = useCallback((category: Category) => {
-    if (category.isSystem) {
-      Alert.alert('Cannot Delete', 'System categories cannot be deleted.');
-      return;
-    }
+  const handleDeleteCategory = useCallback(
+    (category: Category) => {
+      if (category.isSystem) {
+        Alert.alert('Cannot Delete', 'System categories cannot be deleted.');
+        return;
+      }
 
-    const hasTransactions = checkCategoryHasTransactions(category.id);
-    
-    if (hasTransactions) {
-      Alert.alert(
-        'Cannot Delete',
-        'This category has transactions associated with it. Please reassign those transactions first.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+      const hasTransactions = checkCategoryHasTransactions(category.id);
 
-    Alert.alert(
-      'Delete Category',
-      `Are you sure you want to delete "${category.name}"?`,
-      [
+      if (hasTransactions) {
+        Alert.alert(
+          'Cannot Delete',
+          'This category has transactions associated with it. Please reassign those transactions first.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      Alert.alert('Delete Category', `Are you sure you want to delete "${category.name}"?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -104,11 +132,34 @@ export default function SettingsScreen() {
           onPress: () => {
             deleteCategory(category.id);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        }
-      ]
-    );
-  }, [deleteCategory, checkCategoryHasTransactions]);
+          },
+        },
+      ]);
+    },
+    [deleteCategory, checkCategoryHasTransactions]
+  );
+
+  const generateCSV = () => {
+    const headers = ['Date', 'Type', 'Amount', 'Category', 'From Account', 'To Account', 'Notes'];
+
+    const rows = transactions.map((t) => {
+      const category = getCategoryById(t.categoryId);
+      const fromAccount = t.fromAccountId ? getAccountById(t.fromAccountId) : null;
+      const toAccount = t.toAccountId ? getAccountById(t.toAccountId) : null;
+
+      return [
+        t.date.slice(0, 10),
+        t.type,
+        t.amount.toString(),
+        category?.name || '',
+        fromAccount?.name || '',
+        toAccount?.name || '',
+        (t.notes || '').replace(/,/g, ';').replace(/\n/g, ' '),
+      ].join(',');
+    });
+
+    return [headers.join(','), ...rows].join('\n');
+  };
 
   const handleExportTransactions = async () => {
     if (Platform.OS === 'web') {
@@ -126,11 +177,14 @@ export default function SettingsScreen() {
 
     try {
       setIsExporting(true);
+
       const csvContent = generateCSV();
       const fileName = `MoneyManager_Transactions_${new Date().toISOString().slice(0, 10)}.csv`;
-      const cacheDir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory || '';
+
+      const cacheDir =
+        (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory || '';
       const filePath = `${cacheDir}${fileName}`;
-      
+
       await (FileSystem as any).writeAsStringAsync(filePath, csvContent);
 
       const canShare = await Sharing.isAvailableAsync();
@@ -150,49 +204,31 @@ export default function SettingsScreen() {
     }
   };
 
-  const generateCSV = () => {
-    const headers = ['Date', 'Type', 'Amount', 'Category', 'From Account', 'To Account', 'Notes'];
-    const rows = transactions.map(t => {
-      const category = getCategoryById(t.categoryId);
-      const fromAccount = t.fromAccountId ? getAccountById(t.fromAccountId) : null;
-      const toAccount = t.toAccountId ? getAccountById(t.toAccountId) : null;
-      
-      return [
-        t.date.slice(0, 10),
-        t.type,
-        t.amount.toString(),
-        category?.name || '',
-        fromAccount?.name || '',
-        toAccount?.name || '',
-        (t.notes || '').replace(/,/g, ';').replace(/\n/g, ' ')
-      ].join(',');
-    });
-
-    return [headers.join(','), ...rows].join('\n');
-  };
-
-  const incomeCategories = useMemo(() => 
-    categories.filter(c => c.type === 'income'), [categories]);
-  const expenseCategories = useMemo(() => 
-    categories.filter(c => c.type === 'expense'), [categories]);
-  const bothCategories = useMemo(() => 
-    categories.filter(c => c.type === 'both'), [categories]);
+  const incomeCategories = useMemo(
+    () => categories.filter((c) => c.type === 'income'),
+    [categories]
+  );
+  const expenseCategories = useMemo(
+    () => categories.filter((c) => c.type === 'expense'),
+    [categories]
+  );
+  const bothCategories = useMemo(() => categories.filter((c) => c.type === 'both'), [categories]);
 
   const menuItems = [
     {
-      icon: <Download size={20} color={Colors.accent} />,
+      icon: <Ionicons name="download-outline" size={20} color={Colors.accent} />,
       label: 'Export Transactions to CSV',
       subtitle: `${transactions.length} transactions`,
       onPress: handleExportTransactions,
     },
     {
-      icon: <Bell size={20} color={Colors.chart.orange} />,
+      icon: <Ionicons name="notifications-outline" size={20} color={Colors.chart.orange} />,
       label: 'Notifications',
       subtitle: 'Alerts and reminders',
       onPress: () => router.push('/notifications'),
     },
     {
-      icon: <Shield size={20} color={Colors.chart.green} />,
+      icon: <Ionicons name="shield-checkmark-outline" size={20} color={Colors.chart.green} />,
       label: 'Security',
       subtitle: 'PIN and biometric',
       onPress: () => router.push('/security'),
@@ -202,7 +238,7 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Settings' }} />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>General</Text>
@@ -219,7 +255,7 @@ export default function SettingsScreen() {
                   <Text style={styles.menuLabel}>{item.label}</Text>
                   <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                 </View>
-                <ChevronRight size={20} color={Colors.textMuted} />
+                <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
               </TouchableOpacity>
             ))}
           </View>
@@ -228,14 +264,14 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Categories</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addButton}
               onPress={() => {
                 resetCategoryForm();
                 setShowCategoryModal(true);
               }}
             >
-              <Plus size={18} color={Colors.accent} />
+              <Ionicons name="add" size={18} color={Colors.accent} />
               <Text style={styles.addButtonText}>Add</Text>
             </TouchableOpacity>
           </View>
@@ -244,7 +280,7 @@ export default function SettingsScreen() {
             <View style={styles.categorySection}>
               <Text style={styles.categoryGroupTitle}>Expense Categories</Text>
               <View style={styles.categoryList}>
-                {expenseCategories.map(cat => (
+                {expenseCategories.map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
                     style={styles.categoryItem}
@@ -264,7 +300,7 @@ export default function SettingsScreen() {
             <View style={styles.categorySection}>
               <Text style={styles.categoryGroupTitle}>Income Categories</Text>
               <View style={styles.categoryList}>
-                {incomeCategories.map(cat => (
+                {incomeCategories.map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
                     style={styles.categoryItem}
@@ -284,7 +320,7 @@ export default function SettingsScreen() {
             <View style={styles.categorySection}>
               <Text style={styles.categoryGroupTitle}>Transfer Categories</Text>
               <View style={styles.categoryList}>
-                {bothCategories.map(cat => (
+                {bothCategories.map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
                     style={styles.categoryItem}
@@ -307,7 +343,7 @@ export default function SettingsScreen() {
       </ScrollView>
 
       <Modal visible={showCategoryModal} animationType="slide" transparent>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
@@ -316,8 +352,13 @@ export default function SettingsScreen() {
               <Text style={styles.modalTitle}>
                 {isEditingCategory ? 'Edit Category' : 'Add Category'}
               </Text>
-              <TouchableOpacity onPress={() => { setShowCategoryModal(false); resetCategoryForm(); }}>
-                <X size={24} color={Colors.textSecondary} />
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCategoryModal(false);
+                  resetCategoryForm();
+                }}
+              >
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -332,19 +373,18 @@ export default function SettingsScreen() {
 
             <Text style={styles.inputLabel}>Type</Text>
             <View style={styles.typeButtons}>
-              {(['expense', 'income', 'both'] as const).map(t => (
+              {(['expense', 'income', 'both'] as const).map((t) => (
                 <TouchableOpacity
                   key={t}
-                  style={[
-                    styles.typeButton,
-                    categoryType === t && styles.typeButtonActive
-                  ]}
+                  style={[styles.typeButton, categoryType === t && styles.typeButtonActive]}
                   onPress={() => setCategoryType(t)}
                 >
-                  <Text style={[
-                    styles.typeButtonText,
-                    categoryType === t && styles.typeButtonTextActive
-                  ]}>
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      categoryType === t && styles.typeButtonTextActive,
+                    ]}
+                  >
                     {t === 'both' ? 'Transfer' : t.charAt(0).toUpperCase() + t.slice(1)}
                   </Text>
                 </TouchableOpacity>
@@ -353,13 +393,13 @@ export default function SettingsScreen() {
 
             <Text style={styles.inputLabel}>Color</Text>
             <View style={styles.colorGrid}>
-              {categoryColors.map(color => (
+              {categoryColors.map((color) => (
                 <TouchableOpacity
                   key={color}
                   style={[
                     styles.colorChip,
                     { backgroundColor: color },
-                    categoryColor === color && styles.colorChipSelected
+                    categoryColor === color && styles.colorChipSelected,
                   ]}
                   onPress={() => setCategoryColor(color)}
                 />

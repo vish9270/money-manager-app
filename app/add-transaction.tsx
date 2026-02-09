@@ -1,7 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, StyleSheet, Text, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, X, Check } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
@@ -12,16 +22,24 @@ import DatePicker from '@/components/DatePicker';
 export default function AddTransactionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ type?: string; id?: string }>();
-  const { 
-    categories, accounts, goals, investments,
-    addTransaction, updateTransaction, getTransactionById,
-    isAddingTransaction, isUpdatingTransaction 
+  const {
+    categories,
+    accounts,
+    goals,
+    investments,
+    addTransaction,
+    updateTransaction,
+    getTransactionById,
+    isAddingTransaction,
+    isUpdatingTransaction,
   } = useMoney();
-  
+
   const isEditing = !!params.id;
   const existingTransaction = isEditing && params.id ? getTransactionById(params.id) : null;
-  
-  const [type, setType] = useState<TransactionType>((params.type as TransactionType) || existingTransaction?.type || 'expense');
+
+  const [type, setType] = useState<TransactionType>(
+    (params.type as TransactionType) || existingTransaction?.type || 'expense'
+  );
   const [amount, setAmount] = useState(existingTransaction?.amount?.toString() || '');
   const [selectedCategoryId, setSelectedCategoryId] = useState(existingTransaction?.categoryId || '');
   const [selectedFromAccountId, setSelectedFromAccountId] = useState(existingTransaction?.fromAccountId || '');
@@ -37,25 +55,31 @@ export default function AddTransactionScreen() {
     return categories.filter(c => c.type === 'both');
   }, [type, categories]);
 
-  const categoryItems = useMemo(() => 
-    filteredCategories.map(c => ({ id: c.id, name: c.name, color: c.color })),
+  const categoryItems = useMemo(
+    () => filteredCategories.map(c => ({ id: c.id, name: c.name, color: c.color })),
     [filteredCategories]
   );
 
-  const accountItems = useMemo(() => 
-    accounts.map(a => ({ id: a.id, name: a.name, color: a.color })),
+  const accountItems = useMemo(
+    () => accounts.map(a => ({ id: a.id, name: a.name, color: a.color })),
     [accounts]
   );
 
-  const goalItems = useMemo(() => [
-    { id: '', name: 'None', color: Colors.textMuted },
-    ...goals.filter(g => g.status === 'active').map(g => ({ id: g.id, name: g.name, color: g.color }))
-  ], [goals]);
+  const goalItems = useMemo(
+    () => [
+      { id: '', name: 'None', color: Colors.textMuted },
+      ...goals.filter(g => g.status === 'active').map(g => ({ id: g.id, name: g.name, color: g.color })),
+    ],
+    [goals]
+  );
 
-  const investmentItems = useMemo(() => [
-    { id: '', name: 'None', color: Colors.textMuted },
-    ...investments.map(i => ({ id: i.id, name: i.name, color: Colors.income }))
-  ], [investments]);
+  const investmentItems = useMemo(
+    () => [
+      { id: '', name: 'None', color: Colors.textMuted },
+      ...investments.map(i => ({ id: i.id, name: i.name, color: Colors.income })),
+    ],
+    [investments]
+  );
 
   useEffect(() => {
     if (!isEditing) {
@@ -123,36 +147,69 @@ export default function AddTransactionScreen() {
   };
 
   const typeButtons: { type: TransactionType; label: string; icon: React.ReactNode; color: string }[] = [
-    { type: 'expense', label: 'Expense', icon: <ArrowUpRight size={18} color={type === 'expense' ? Colors.textInverse : Colors.expense} />, color: Colors.expense },
-    { type: 'income', label: 'Income', icon: <ArrowDownLeft size={18} color={type === 'income' ? Colors.textInverse : Colors.income} />, color: Colors.income },
-    { type: 'transfer', label: 'Transfer', icon: <ArrowLeftRight size={18} color={type === 'transfer' ? Colors.textInverse : Colors.transfer} />, color: Colors.transfer },
+    {
+      type: 'expense',
+      label: 'Expense',
+      icon: (
+        <Ionicons
+          name="arrow-up-outline"
+          size={18}
+          color={type === 'expense' ? Colors.textInverse : Colors.expense}
+        />
+      ),
+      color: Colors.expense,
+    },
+    {
+      type: 'income',
+      label: 'Income',
+      icon: (
+        <Ionicons
+          name="arrow-down-outline"
+          size={18}
+          color={type === 'income' ? Colors.textInverse : Colors.income}
+        />
+      ),
+      color: Colors.income,
+    },
+    {
+      type: 'transfer',
+      label: 'Transfer',
+      icon: (
+        <Ionicons
+          name="swap-horizontal-outline"
+          size={18}
+          color={type === 'transfer' ? Colors.textInverse : Colors.transfer}
+        />
+      ),
+      color: Colors.transfer,
+    },
   ];
 
   const isPending = isAddingTransaction || isUpdatingTransaction;
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
     >
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           title: isEditing ? 'Edit Transaction' : 'Add Transaction',
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()}>
-              <X size={24} color={Colors.text} />
+              <Ionicons name="close" size={24} color={Colors.text} />
             </TouchableOpacity>
           ),
           headerRight: () => (
             <TouchableOpacity onPress={handleSubmit} disabled={isPending}>
-              <Check size={24} color={Colors.accent} />
+              <Ionicons name="checkmark" size={24} color={Colors.accent} />
             </TouchableOpacity>
           ),
-        }} 
+        }}
       />
-      
-      <ScrollView 
+
+      <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContent}
@@ -161,20 +218,14 @@ export default function AddTransactionScreen() {
           {typeButtons.map(btn => (
             <TouchableOpacity
               key={btn.type}
-              style={[
-                styles.typeButton,
-                type === btn.type && { backgroundColor: btn.color }
-              ]}
+              style={[styles.typeButton, type === btn.type && { backgroundColor: btn.color }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setType(btn.type);
               }}
             >
               {btn.icon}
-              <Text style={[
-                styles.typeButtonText,
-                type === btn.type && styles.typeButtonTextActive
-              ]}>
+              <Text style={[styles.typeButtonText, type === btn.type && styles.typeButtonTextActive]}>
                 {btn.label}
               </Text>
             </TouchableOpacity>
@@ -195,12 +246,7 @@ export default function AddTransactionScreen() {
         </View>
 
         <View style={styles.section}>
-          <DatePicker
-            date={date}
-            onDateChange={setDate}
-            label="Date"
-            maximumDate={new Date()}
-          />
+          <DatePicker date={date} onDateChange={setDate} label="Date" maximumDate={new Date()} />
         </View>
 
         <View style={styles.section}>
@@ -274,13 +320,19 @@ export default function AddTransactionScreen() {
           />
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.submitButton, isPending && styles.submitButtonDisabled]}
           onPress={handleSubmit}
           disabled={isPending}
         >
           <Text style={styles.submitButtonText}>
-            {isPending ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Transaction')}
+            {isPending
+              ? isEditing
+                ? 'Saving...'
+                : 'Adding...'
+              : isEditing
+                ? 'Save Changes'
+                : 'Add Transaction'}
           </Text>
         </TouchableOpacity>
 

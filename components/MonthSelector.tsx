@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 import { getMonthYear, getMonthKey } from '@/utils/helpers';
 
@@ -27,15 +27,21 @@ export default function MonthSelector({ selectedMonth, onMonthChange }: MonthSel
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={goToPreviousMonth} style={styles.button}>
-        <ChevronLeft size={20} color={Colors.primary} />
+        <Ionicons name="chevron-back" size={20} color={Colors.primary} />
       </TouchableOpacity>
+
       <Text style={styles.monthText}>{getMonthYear(`${selectedMonth}-01`)}</Text>
-      <TouchableOpacity 
-        onPress={goToNextMonth} 
+
+      <TouchableOpacity
+        onPress={goToNextMonth}
         style={[styles.button, isCurrentMonth && styles.buttonDisabled]}
         disabled={isCurrentMonth}
       >
-        <ChevronRight size={20} color={isCurrentMonth ? Colors.textMuted : Colors.primary} />
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={isCurrentMonth ? Colors.textMuted : Colors.primary}
+        />
       </TouchableOpacity>
     </View>
   );

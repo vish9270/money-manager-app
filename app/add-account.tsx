@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Building2, PiggyBank, Banknote, CreditCard, Landmark, Wallet, X, Check } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
@@ -18,7 +18,12 @@ const accountTypeOptions: { type: AccountType; label: string; icon: string }[] =
 ];
 
 const iconComponents: Record<string, React.ComponentType<{ size: number; color: string }>> = {
-  Building2, PiggyBank, Banknote, CreditCard, Landmark, Wallet,
+  Building2: ({ size, color }) => <Ionicons name="business-outline" size={size} color={color} />,
+  PiggyBank: ({ size, color }) => <Ionicons name="wallet-outline" size={size} color={color} />,
+  Banknote: ({ size, color }) => <Ionicons name="cash-outline" size={size} color={color} />,
+  CreditCard: ({ size, color }) => <Ionicons name="card-outline" size={size} color={color} />,
+  Landmark: ({ size, color }) => <Ionicons name="library-outline" size={size} color={color} />,
+  Wallet: ({ size, color }) => <Ionicons name="wallet-outline" size={size} color={color} />,
 };
 
 const colorOptions = [
@@ -35,7 +40,7 @@ const colorOptions = [
 export default function AddAccountScreen() {
   const router = useRouter();
   const { addAccount } = useMoney();
-  
+
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('savings');
   const [balance, setBalance] = useState('');
@@ -70,22 +75,22 @@ export default function AddAccountScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           title: 'Add Account',
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()}>
-              <X size={24} color={Colors.text} />
+              <Ionicons name="close" size={24} color={Colors.text} />
             </TouchableOpacity>
           ),
           headerRight: () => (
             <TouchableOpacity onPress={handleSubmit}>
-              <Check size={24} color={Colors.accent} />
+              <Ionicons name="checkmark" size={24} color={Colors.accent} />
             </TouchableOpacity>
           ),
-        }} 
+        }}
       />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Type</Text>
@@ -97,18 +102,17 @@ export default function AddAccountScreen() {
                   key={opt.type}
                   style={[
                     styles.typeOption,
-                    type === opt.type && { backgroundColor: selectedColor + '20', borderColor: selectedColor }
+                    type === opt.type && { backgroundColor: selectedColor + '20', borderColor: selectedColor },
                   ]}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setType(opt.type);
                   }}
                 >
-                  {IconComp && <IconComp size={24} color={type === opt.type ? selectedColor : Colors.textSecondary} />}
-                  <Text style={[
-                    styles.typeOptionText,
-                    type === opt.type && { color: selectedColor }
-                  ]}>
+                  {IconComp && (
+                    <IconComp size={24} color={type === opt.type ? selectedColor : Colors.textSecondary} />
+                  )}
+                  <Text style={[styles.typeOptionText, type === opt.type && { color: selectedColor }]}>
                     {opt.label}
                   </Text>
                 </TouchableOpacity>
@@ -140,11 +144,7 @@ export default function AddAccountScreen() {
             value={balance}
             onChangeText={setBalance}
           />
-          {isCreditOrLoan && (
-            <Text style={styles.helperText}>
-              Enter the amount you currently owe
-            </Text>
-          )}
+          {isCreditOrLoan && <Text style={styles.helperText}>Enter the amount you currently owe</Text>}
         </View>
 
         {type === 'credit_card' && (
@@ -170,7 +170,7 @@ export default function AddAccountScreen() {
                 style={[
                   styles.colorOption,
                   { backgroundColor: color },
-                  selectedColor === color && styles.colorOptionSelected
+                  selectedColor === color && styles.colorOptionSelected,
                 ]}
                 onPress={() => setSelectedColor(color)}
               />

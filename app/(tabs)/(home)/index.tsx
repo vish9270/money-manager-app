@@ -1,11 +1,15 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  ArrowDownLeft, ArrowUpRight, ArrowLeftRight, TrendingUp, 
-  CreditCard, AlertCircle, ChevronRight, Wallet
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
 import { formatCurrency, formatFullCurrency, getPreviousMonths } from '@/utils/helpers';
@@ -18,18 +22,29 @@ import TransactionItem from '@/components/TransactionItem';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { 
-    selectedMonth, setSelectedMonth, getMonthlyStats, 
-    transactions, goals, categories, accounts,
-    getTotalCreditDue, getTotalNetWorth, getTotalInvestmentValue,
-    getCurrentBudget, getCategoryById, getAccountById, isLoading
+  const {
+    selectedMonth,
+    setSelectedMonth,
+    getMonthlyStats,
+    transactions,
+    goals,
+    getTotalCreditDue,
+    getTotalNetWorth,
+    getTotalInvestmentValue,
+    getCurrentBudget,
+    getCategoryById,
+    getAccountById,
   } = useMoney();
 
-  const stats = useMemo(() => getMonthlyStats(selectedMonth), [selectedMonth, getMonthlyStats]);
+  const stats = useMemo(
+    () => getMonthlyStats(selectedMonth),
+    [selectedMonth, getMonthlyStats]
+  );
+
   const budget = getCurrentBudget();
-  
+
   const donutData = useMemo(() => {
-    return stats.categoryBreakdown.slice(0, 6).map(item => {
+    return stats.categoryBreakdown.slice(0, 6).map((item) => {
       const category = getCategoryById(item.categoryId);
       return {
         value: item.amount,
@@ -41,10 +56,23 @@ export default function DashboardScreen() {
 
   const barData = useMemo(() => {
     const months = getPreviousMonths(6).reverse();
-    return months.map(month => {
+    return months.map((month) => {
       const monthStats = getMonthlyStats(month);
       const [, m] = month.split('-');
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthNames = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       return {
         label: monthNames[parseInt(m) - 1],
         income: monthStats.totalIncome,
@@ -60,7 +88,7 @@ export default function DashboardScreen() {
   }, [transactions]);
 
   const activeGoals = useMemo(() => {
-    return goals.filter(g => g.status === 'active').slice(0, 3);
+    return goals.filter((g) => g.status === 'active').slice(0, 3);
   }, [goals]);
 
   const budgetUsedPercent = useMemo(() => {
@@ -77,10 +105,12 @@ export default function DashboardScreen() {
   }, []);
 
   return (
-    <ScrollView 
-      style={styles.container} 
+    <ScrollView
+      style={styles.container}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
     >
       <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
 
@@ -93,63 +123,82 @@ export default function DashboardScreen() {
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
             <View style={styles.summaryLabel}>
-              <ArrowDownLeft size={14} color={Colors.income} />
+              <Ionicons name="arrow-down" size={14} color={Colors.income} />
               <Text style={styles.summaryLabelText}>Income</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(stats.totalIncome)}</Text>
           </View>
+
           <View style={styles.summaryDivider} />
+
           <View style={styles.summaryItem}>
             <View style={styles.summaryLabel}>
-              <ArrowUpRight size={14} color={Colors.expense} />
+              <Ionicons name="arrow-up" size={14} color={Colors.expense} />
               <Text style={styles.summaryLabelText}>Expense</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(stats.totalExpense)}</Text>
           </View>
         </View>
+
         <View style={styles.surplusRow}>
           <Text style={styles.surplusLabel}>
             {stats.surplus >= 0 ? 'Surplus' : 'Deficit'}
           </Text>
           <Text style={[styles.surplusValue, stats.surplus < 0 && styles.deficitValue]}>
-            {stats.surplus >= 0 ? '+' : ''}{formatFullCurrency(stats.surplus)}
+            {stats.surplus >= 0 ? '+' : ''}
+            {formatFullCurrency(stats.surplus)}
           </Text>
         </View>
       </LinearGradient>
 
       <View style={styles.quickStats}>
-        <TouchableOpacity style={styles.quickStatItem} onPress={() => router.push('/accounts')}>
-          <Wallet size={18} color={Colors.accent} />
+        <TouchableOpacity
+          style={styles.quickStatItem}
+          onPress={() => router.push('/accounts')}
+        >
+          <Ionicons name="wallet" size={18} color={Colors.accent} />
           <Text style={styles.quickStatLabel}>Net Worth</Text>
           <Text style={styles.quickStatValue}>{formatCurrency(getTotalNetWorth)}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickStatItem} onPress={() => router.push('/accounts')}>
-          <CreditCard size={18} color={Colors.expense} />
+
+        <TouchableOpacity
+          style={styles.quickStatItem}
+          onPress={() => router.push('/accounts')}
+        >
+          <Ionicons name="card" size={18} color={Colors.expense} />
           <Text style={styles.quickStatLabel}>Credit Due</Text>
-          <Text style={[styles.quickStatValue, styles.creditValue]}>{formatCurrency(getTotalCreditDue)}</Text>
+          <Text style={[styles.quickStatValue, styles.creditValue]}>
+            {formatCurrency(getTotalCreditDue)}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickStatItem}>
-          <TrendingUp size={18} color={Colors.income} />
+
+        <TouchableOpacity
+          style={styles.quickStatItem}
+          onPress={() => router.push('/investments')}
+        >
+          <Ionicons name="trending-up" size={18} color={Colors.income} />
           <Text style={styles.quickStatLabel}>Investments</Text>
-          <Text style={[styles.quickStatValue, styles.investValue]}>{formatCurrency(getTotalInvestmentValue)}</Text>
+          <Text style={[styles.quickStatValue, styles.investValue]}>
+            {formatCurrency(getTotalInvestmentValue)}
+          </Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.quickActions}>
-        <QuickActionButton 
-          icon={<ArrowUpRight size={20} color={Colors.expense} />}
+        <QuickActionButton
+          icon={<Ionicons name="arrow-up" size={20} color={Colors.expense} />}
           label="Expense"
           color={Colors.expense}
           onPress={() => router.push('/add-transaction?type=expense')}
         />
-        <QuickActionButton 
-          icon={<ArrowDownLeft size={20} color={Colors.income} />}
+        <QuickActionButton
+          icon={<Ionicons name="arrow-down" size={20} color={Colors.income} />}
           label="Income"
           color={Colors.income}
           onPress={() => router.push('/add-transaction?type=income')}
         />
-        <QuickActionButton 
-          icon={<ArrowLeftRight size={20} color={Colors.transfer} />}
+        <QuickActionButton
+          icon={<Ionicons name="swap-horizontal" size={20} color={Colors.transfer} />}
           label="Transfer"
           color={Colors.transfer}
           onPress={() => router.push('/add-transaction?type=transfer')}
@@ -157,18 +206,24 @@ export default function DashboardScreen() {
       </View>
 
       {budget && (
-        <TouchableOpacity style={styles.budgetBanner} onPress={() => router.push('/budgets')}>
+        <TouchableOpacity
+          style={styles.budgetBanner}
+          onPress={() => router.push('/budgets')}
+        >
           <View style={styles.budgetInfo}>
             <Text style={styles.budgetTitle}>Budget</Text>
-            <Text style={styles.budgetText}>
-              {budgetUsedPercent}% used this month
-            </Text>
+            <Text style={styles.budgetText}>{budgetUsedPercent}% used this month</Text>
           </View>
-          <View style={[
-            styles.budgetIndicator, 
-            budgetUsedPercent >= 100 && styles.budgetOverspent,
-            budgetUsedPercent >= 80 && budgetUsedPercent < 100 && styles.budgetWarning
-          ]}>
+
+          <View
+            style={[
+              styles.budgetIndicator,
+              budgetUsedPercent >= 100 && styles.budgetOverspent,
+              budgetUsedPercent >= 80 &&
+                budgetUsedPercent < 100 &&
+                styles.budgetWarning,
+            ]}
+          >
             <Text style={styles.budgetPercent}>{budgetUsedPercent}%</Text>
           </View>
         </TouchableOpacity>
@@ -178,10 +233,11 @@ export default function DashboardScreen() {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Expense Breakdown</Text>
         </View>
+
         <View style={styles.chartContainer}>
           {stats.totalExpense > 0 ? (
             <>
-              <DonutChart 
+              <DonutChart
                 data={donutData}
                 size={140}
                 strokeWidth={20}
@@ -192,14 +248,16 @@ export default function DashboardScreen() {
                 {donutData.slice(0, 5).map((item, index) => (
                   <View key={index} style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: item.color }]} />
-                    <Text style={styles.legendLabel} numberOfLines={1}>{item.label}</Text>
+                    <Text style={styles.legendLabel} numberOfLines={1}>
+                      {item.label}
+                    </Text>
                   </View>
                 ))}
               </View>
             </>
           ) : (
             <View style={styles.emptyChart}>
-              <AlertCircle size={32} color={Colors.textMuted} />
+              <Ionicons name="alert-circle" size={32} color={Colors.textMuted} />
               <Text style={styles.emptyText}>No expenses this month</Text>
             </View>
           )}
@@ -217,31 +275,46 @@ export default function DashboardScreen() {
 
       {activeGoals.length > 0 && (
         <View style={styles.section}>
-          <TouchableOpacity style={styles.sectionHeader} onPress={() => router.push('/goals')}>
+          <TouchableOpacity
+            style={styles.sectionHeader}
+            onPress={() => router.push('/goals')}
+          >
             <Text style={styles.sectionTitle}>Goals</Text>
-            <ChevronRight size={18} color={Colors.textSecondary} />
+            <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
           </TouchableOpacity>
+
           <View style={styles.goalsList}>
-            {activeGoals.map(goal => (
-              <GoalCard key={goal.id} goal={goal} compact onPress={() => router.push('/goals')} />
+            {activeGoals.map((goal) => (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                compact
+                onPress={() => router.push('/goals')}
+              />
             ))}
           </View>
         </View>
       )}
 
       <View style={styles.section}>
-        <TouchableOpacity style={styles.sectionHeader} onPress={() => router.push('/transactions')}>
+        <TouchableOpacity
+          style={styles.sectionHeader}
+          onPress={() => router.push('/transactions')}
+        >
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <ChevronRight size={18} color={Colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
         </TouchableOpacity>
+
         <View style={styles.transactionsList}>
           {recentTransactions.length > 0 ? (
-            recentTransactions.map(txn => (
-              <TransactionItem 
-                key={txn.id} 
+            recentTransactions.map((txn) => (
+              <TransactionItem
+                key={txn.id}
                 transaction={txn}
                 category={getCategoryById(txn.categoryId)}
-                fromAccount={txn.fromAccountId ? getAccountById(txn.fromAccountId) : undefined}
+                fromAccount={
+                  txn.fromAccountId ? getAccountById(txn.fromAccountId) : undefined
+                }
                 toAccount={txn.toAccountId ? getAccountById(txn.toAccountId) : undefined}
                 onPress={() => router.push('/transactions')}
               />
@@ -249,7 +322,9 @@ export default function DashboardScreen() {
           ) : (
             <View style={styles.emptyTransactions}>
               <Text style={styles.emptyText}>No transactions yet</Text>
-              <Text style={styles.emptySubtext}>Add your first transaction to get started</Text>
+              <Text style={styles.emptySubtext}>
+                Add your first transaction to get started
+              </Text>
             </View>
           )}
         </View>

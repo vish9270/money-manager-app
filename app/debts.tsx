@@ -1,23 +1,21 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Text, ScrollView } from 'react-native';
 import { Stack } from 'expo-router';
-import { CreditCard, TrendingDown, Calendar, Percent } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 import { useMoney } from '@/providers/MoneyProvider';
-import { formatCurrency, formatFullCurrency, formatDate, getRelativeTime } from '@/utils/helpers';
+import { formatCurrency, formatFullCurrency, getRelativeTime } from '@/utils/helpers';
 import ProgressBar from '@/components/ProgressBar';
 
 export default function DebtsScreen() {
   const { debts, getTotalDebtOutstanding } = useMoney();
 
-  const totalPrincipal = useMemo(() => 
-    debts.reduce((sum, d) => sum + d.principalAmount, 0), [debts]);
-  
+  const totalPrincipal = useMemo(() => debts.reduce((sum, d) => sum + d.principalAmount, 0), [debts]);
+
   const totalPaid = totalPrincipal - getTotalDebtOutstanding;
   const payoffProgress = totalPrincipal > 0 ? (totalPaid / totalPrincipal) * 100 : 0;
 
-  const monthlyEMI = useMemo(() => 
-    debts.reduce((sum, d) => sum + (d.emiAmount || 0), 0), [debts]);
+  const monthlyEMI = useMemo(() => debts.reduce((sum, d) => sum + (d.emiAmount || 0), 0), [debts]);
 
   const getDebtColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -32,21 +30,17 @@ export default function DebtsScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Debts & Loans' }} />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
-            <TrendingDown size={24} color={Colors.expense} />
+            <Ionicons name="trending-down-outline" size={24} color={Colors.expense} />
             <Text style={styles.summaryTitle}>Total Outstanding</Text>
           </View>
           <Text style={styles.outstandingValue}>{formatFullCurrency(getTotalDebtOutstanding)}</Text>
-          
+
           <View style={styles.progressSection}>
-            <ProgressBar 
-              progress={payoffProgress} 
-              height={8} 
-              progressColor={Colors.income}
-            />
+            <ProgressBar progress={payoffProgress} height={8} progressColor={Colors.income} />
             <Text style={styles.progressText}>
               {payoffProgress.toFixed(0)}% paid off • {formatCurrency(totalPaid)} of {formatCurrency(totalPrincipal)}
             </Text>
@@ -69,22 +63,18 @@ export default function DebtsScreen() {
           <View style={styles.debtList}>
             {debts.map(debt => {
               const paid = debt.principalAmount - debt.outstandingAmount;
-              const progress = debt.principalAmount > 0 
-                ? (paid / debt.principalAmount) * 100 
-                : 0;
+              const progress = debt.principalAmount > 0 ? (paid / debt.principalAmount) * 100 : 0;
               const color = getDebtColor(debt.type);
-              
+
               return (
                 <View key={debt.id} style={styles.debtCard}>
                   <View style={styles.debtHeader}>
                     <View style={[styles.debtIcon, { backgroundColor: color + '20' }]}>
-                      <CreditCard size={20} color={color} />
+                      <Ionicons name="card-outline" size={20} color={color} />
                     </View>
                     <View style={styles.debtInfo}>
                       <Text style={styles.debtName}>{debt.name}</Text>
-                      <Text style={styles.debtType}>
-                        {debt.type.replace('_', ' ').toUpperCase()}
-                      </Text>
+                      <Text style={styles.debtType}>{debt.type.replace('_', ' ').toUpperCase()}</Text>
                     </View>
                     <View style={styles.debtValues}>
                       <Text style={styles.outstandingText}>{formatCurrency(debt.outstandingAmount)}</Text>
@@ -94,32 +84,26 @@ export default function DebtsScreen() {
 
                   <View style={styles.progressContainer}>
                     <ProgressBar progress={progress} height={6} progressColor={color} />
-                    <Text style={styles.progressLabel}>
-                      {progress.toFixed(0)}% paid
-                    </Text>
+                    <Text style={styles.progressLabel}>{progress.toFixed(0)}% paid</Text>
                   </View>
-                  
+
                   <View style={styles.debtDetails}>
                     {debt.emiAmount && (
                       <View style={styles.detailItem}>
-                        <Calendar size={14} color={Colors.textMuted} />
+                        <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
                         <Text style={styles.detailText}>
                           EMI: {formatCurrency(debt.emiAmount)} on day {debt.emiDay}
                         </Text>
                       </View>
                     )}
                     <View style={styles.detailItem}>
-                      <Percent size={14} color={Colors.textMuted} />
-                      <Text style={styles.detailText}>
-                        Interest: {debt.interestRate}% p.a.
-                      </Text>
+                      <Ionicons name="percent-outline" size={14} color={Colors.textMuted} />
+                      <Text style={styles.detailText}>Interest: {debt.interestRate}% p.a.</Text>
                     </View>
                     {debt.endDate && (
                       <View style={styles.detailItem}>
-                        <TrendingDown size={14} color={Colors.textMuted} />
-                        <Text style={styles.detailText}>
-                          Ends: {getRelativeTime(debt.endDate)}
-                        </Text>
+                        <Ionicons name="trending-down-outline" size={14} color={Colors.textMuted} />
+                        <Text style={styles.detailText}>Ends: {getRelativeTime(debt.endDate)}</Text>
                       </View>
                     )}
                   </View>
@@ -131,9 +115,11 @@ export default function DebtsScreen() {
 
         {debts.length === 0 && (
           <View style={styles.emptyState}>
-            <CreditCard size={48} color={Colors.textMuted} />
+            <Ionicons name="card-outline" size={48} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No debts tracked</Text>
-            <Text style={styles.emptySubtitle}>Add your loans and credit cards to track payoff progress</Text>
+            <Text style={styles.emptySubtitle}>
+              Add your loans and credit cards to track payoff progress
+            </Text>
           </View>
         )}
 
