@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
-import { DB_NAME, CREATE_TABLES_SQL } from './schema';
+import { DB_NAME, CREATE_TABLES_SQL,DROP_TABLES_SQL } from './schema';
 
 let db: SQLite.SQLiteDatabase | null = null;
 let initPromise: Promise<void> | null = null;
@@ -32,13 +32,13 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 }
 
 function splitSqlStatements(sql: string): string[] {
-  // Simple, but safer than raw split(';') because it trims and removes comments.
-  // Still not perfect for complex SQL blocks, but good for this schema.
   return sql
+    .split('\n')
+    .map(line => line.replace(/--.*$/g, '').trim()) // remove inline comments
+    .join('\n')
     .split(';')
     .map(s => s.trim())
-    .filter(Boolean)
-    .filter(s => !s.startsWith('--'));
+    .filter(Boolean);
 }
 
 export async function initializeDatabase(): Promise<void> {
@@ -111,4 +111,31 @@ export async function runTransaction(callback: () => Promise<void>): Promise<voi
 
   const database = await getDatabase();
   await database.withTransactionAsync(callback);
+}
+
+export async function resetDatabase(): Promise<void> {
+  if (isWeb) return;
+
+  const database = await getDatabase();
+
+  const dropStatements = splitSqlStatements(DROP_TABLES_SQL);
+  const createStatements = splitSqlStatements(CREATE_TABLES_SQL);
+
+  await database.withTransactionAsync(async () => {
+    await database.execAsync(`PRAGMA foreign_keys = OFF;`);
+
+    // Drop all tables one-by-one
+    for (const stmt of dropStatements) {
+      await database.execAsync(stmt + ';');
+    }
+
+    // Create all tables one-by-one
+    for (const stmt of createStatements) {
+      await database.execAsync(stmt + ';');
+    }
+
+    await database.execAsync(`PRAGMA foreign_keys = ON;`);
+  });
+
+  console.log('Database reset successfully');
 }

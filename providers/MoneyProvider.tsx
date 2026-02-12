@@ -29,7 +29,7 @@ import {
 
 import { generateId, getMonthKey, getStartOfMonth, getEndOfMonth } from '@/utils/helpers';
 
-import { initializeDatabase, runTransaction } from '@/db/repositories/database';
+import { initializeDatabase, runTransaction,resetDatabase } from '@/db/repositories/database';
 
 import * as accountRepo from '@/db/repositories/accountRepository';
 import * as categoryRepo from '@/db/repositories/categoryRepository';
@@ -127,10 +127,59 @@ export const [MoneyProvider, useMoney] = createContextHook(() => {
   const [selectedMonth, setSelectedMonth] = useState(getMonthKey());
   const [dateFilter, setDateFilter] = useState<{ startDate?: string; endDate?: string }>({});
   const [dbReady, setDbReady] = useState(false);
+  const resetAppData = useCallback(async () => {
+  try {
+    // 1) Reset DB
+    await resetDatabase();
+
+    // 2) Ensure schema exists (extra safety)
+    await initializeDatabase();
+
+    // 3) Seed ONLY system categories
+    await categoryRepo.insertCategories(defaultCategories);
+
+    // 4) Reset UI filters
+    setSelectedMonth(getMonthKey());
+    setDateFilter({});
+
+    // 5) Clear cache
+    queryClient.clear();
+
+    // 6) Force refetch
+    await queryClient.invalidateQueries();
+  } catch (e) {
+    console.error('Reset App Data failed:', e);
+    throw e;
+  }
+}, [queryClient]);
 
   // =========================
   // DB INIT + SEED
   // =========================
+
+  const seedDatabase = async () => {
+    const SEED_DEMO_DATA = false;
+    try {
+        await runTransaction(async () => {
+        await categoryRepo.insertCategories(defaultCategories);
+
+if (SEED_DEMO_DATA) {
+          await accountRepo.insertAccounts(sampleAccounts);
+          await transactionRepo.insertTransactions(sampleTransactions);
+          await budgetRepo.insertBudgets([sampleBudget]);
+          await goalRepo.insertGoals(sampleGoals);
+          await recurringRepo.insertRecurring(sampleRecurring);
+          await debtRepo.insertDebts(sampleDebts);
+          await investmentRepo.insertInvestments(sampleInvestments);
+      }
+
+      });
+
+      console.log('Database seeded successfully');
+    } catch (error) {
+      console.error('Error seeding database:', error);
+    }
+  };
 
   useEffect(() => {
     const initDb = async () => {
@@ -151,25 +200,6 @@ export const [MoneyProvider, useMoney] = createContextHook(() => {
 
     initDb();
   }, []);
-
-  const seedDatabase = async () => {
-    try {
-      await runTransaction(async () => {
-        await categoryRepo.insertCategories(defaultCategories);
-        await accountRepo.insertAccounts(sampleAccounts);
-        await transactionRepo.insertTransactions(sampleTransactions);
-        await budgetRepo.insertBudgets([sampleBudget]);
-        await goalRepo.insertGoals(sampleGoals);
-        await recurringRepo.insertRecurring(sampleRecurring);
-        await debtRepo.insertDebts(sampleDebts);
-        await investmentRepo.insertInvestments(sampleInvestments);
-      });
-
-      console.log('Database seeded successfully');
-    } catch (error) {
-      console.error('Error seeding database:', error);
-    }
-  };
 
   // =========================
   // QUERIES
@@ -1045,7 +1075,7 @@ export const [MoneyProvider, useMoney] = createContextHook(() => {
     investments,
     alerts,
     settings,
-
+    resetAppData,
     selectedMonth,
     setSelectedMonth,
 
