@@ -1,49 +1,42 @@
 import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
+import { AlertTriangle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { BudgetLine, Category } from '@/types';
+import { formatCurrency } from '@/utils/helpers';
+import ProgressBar from './ProgressBar';
 
-interface BarChartProps {
-  data: { label: string; income: number; expense: number }[];
-  height?: number;
+interface BudgetCardProps {
+  line: BudgetLine;
+  category?: Category;
+  spent: number;
 }
 
-export default function BarChart({ data, height = 140 }: BarChartProps) {
-  const maxValue = Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
-  
+export default function BudgetCard({ line, category, spent }: BudgetCardProps) {
+  const progress = line.planned > 0 ? (spent / line.planned) * 100 : 0;
+  const remaining = line.planned - spent;
+  const isOverspent = spent > line.planned;
+  const isWarning = progress >= line.alertThreshold && !isOverspent;
+
   return (
     <View style={styles.container}>
-      <View style={[styles.chartArea, { height }]}>
-        {data.map((item, index) => (
-          <View key={index} style={styles.barGroup}>
-            <View style={styles.barsContainer}>
-              <View 
-                style={[
-                  styles.bar, 
-                  styles.incomeBar,
-                  { height: (item.income / maxValue) * height }
-                ]} 
-              />
-              <View 
-                style={[
-                  styles.bar, 
-                  styles.expenseBar,
-                  { height: (item.expense / maxValue) * height }
-                ]} 
-              />
-            </View>
-            <Text style={styles.label}>{item.label}</Text>
-          </View>
-        ))}
+      <View style={styles.header}>
+        <View style={[styles.dot, { backgroundColor: category?.color || Colors.textMuted }]} />
+        <Text style={styles.name}>{category?.name || 'Unknown'}</Text>
+        {(isOverspent || isWarning) && (
+          <AlertTriangle size={14} color={isOverspent ? Colors.expense : Colors.warning} />
+        )}
       </View>
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: Colors.income }]} />
-          <Text style={styles.legendText}>Income</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: Colors.expense }]} />
-          <Text style={styles.legendText}>Expense</Text>
-        </View>
+
+      <ProgressBar progress={progress} height={6} showOverspend />
+
+      <View style={styles.footer}>
+        <Text style={styles.spentText}>
+          {formatCurrency(spent)} <Text style={styles.plannedText}>/ {formatCurrency(line.planned)}</Text>
+        </Text>
+        <Text style={[styles.remaining, isOverspent && styles.overspent]}>
+          {isOverspent ? `Over by ${formatCurrency(Math.abs(remaining))}` : `${formatCurrency(remaining)} left`}
+        </Text>
       </View>
     </View>
   );
@@ -51,57 +44,47 @@ export default function BarChart({ data, height = 140 }: BarChartProps) {
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
   },
-  chartArea: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-  },
-  barGroup: {
     alignItems: 'center',
+    gap: 8,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  name: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    color: Colors.text,
     flex: 1,
   },
-  barsContainer: {
+  footer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
-  },
-  bar: {
-    width: 14,
-    borderRadius: 4,
-    minHeight: 4,
-  },
-  incomeBar: {
-    backgroundColor: Colors.income,
-  },
-  expenseBar: {
-    backgroundColor: Colors.expense,
-  },
-  label: {
-    fontSize: 10,
-    color: Colors.textSecondary,
-    marginTop: 6,
-  },
-  legend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 20,
-    marginTop: 12,
-  },
-  legendItem: {
-    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 6,
   },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  spentText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.text,
   },
-  legendText: {
-    fontSize: 11,
+  plannedText: {
+    fontWeight: '400' as const,
     color: Colors.textSecondary,
+  },
+  remaining: {
+    fontSize: 12,
+    color: Colors.income,
+    fontWeight: '500' as const,
+  },
+  overspent: {
+    color: Colors.expense,
   },
 });
