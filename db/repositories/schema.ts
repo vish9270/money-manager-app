@@ -161,6 +161,13 @@ CREATE TABLE IF NOT EXISTS recurring_runs (
   FOREIGN KEY (transaction_id) REFERENCES transactions(id)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_recurring_runs
+ON recurring_runs(recurring_id, run_date);
+
+CREATE INDEX IF NOT EXISTS idx_recurring_next_run_date
+ON recurring(next_run_date);
+
+
 -- Rules table
 CREATE TABLE IF NOT EXISTS rules (
   id TEXT PRIMARY KEY,

@@ -34,8 +34,11 @@ export const getMonthYear = (dateString: string): string => {
 };
 
 export const getMonthKey = (date: Date = new Date()): string => {
-  return date.toISOString().slice(0, 7);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
 };
+
 
 export const getStartOfMonth = (monthKey: string): Date => {
   const [year, month] = monthKey.split('-').map(Number);
