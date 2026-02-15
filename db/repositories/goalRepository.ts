@@ -36,17 +36,12 @@ function mapRowToGoal(row: GoalRow): Goal {
 }
 
 export async function getAllGoals(): Promise<Goal[]> {
-  const rows = await runQuery<GoalRow>(
-    'SELECT * FROM goals ORDER BY priority, name'
-  );
+  const rows = await runQuery<GoalRow>('SELECT * FROM goals ORDER BY priority, name');
   return rows.map(mapRowToGoal);
 }
 
 export async function getGoalById(id: string): Promise<Goal | null> {
-  const rows = await runQuery<GoalRow>(
-    'SELECT * FROM goals WHERE id = ?',
-    [id]
-  );
+  const rows = await runQuery<GoalRow>('SELECT * FROM goals WHERE id = ?', [id]);
   return rows.length > 0 ? mapRowToGoal(rows[0]) : null;
 }
 
@@ -74,7 +69,18 @@ export async function createGoal(goal: Goal): Promise<void> {
 
 export async function updateGoal(goal: Goal): Promise<void> {
   await runStatement(
-    `UPDATE goals SET name = ?, target_amount = ?, saved_amount = ?, target_date = ?, icon = ?, color = ?, priority = ?, status = ?, account_id = ?, notes = ?, updated_at = ?
+    `UPDATE goals
+     SET name = ?,
+         target_amount = ?,
+         saved_amount = ?,
+         target_date = ?,
+         icon = ?,
+         color = ?,
+         priority = ?,
+         status = ?,
+         account_id = ?,
+         notes = ?,
+         updated_at = ?
      WHERE id = ?`,
     [
       goal.name,
@@ -93,11 +99,58 @@ export async function updateGoal(goal: Goal): Promise<void> {
   );
 }
 
-export async function updateGoalSavedAmount(id: string, amount: number): Promise<void> {
+/**
+ * Legacy helper (increment style).
+ * We'll keep it, but MoneyProvider should stop using it in Phase 1.
+ */
+export async function updateGoalSavedAmount(id: string, amountDelta: number): Promise<void> {
   await runStatement(
-    `UPDATE goals SET saved_amount = saved_amount + ?, updated_at = ? WHERE id = ?`,
-    [amount, new Date().toISOString(), id]
+    `UPDATE goals
+     SET saved_amount = saved_amount + ?,
+         updated_at = ?
+     WHERE id = ?`,
+    [amountDelta, new Date().toISOString(), id]
   );
+}
+
+/**
+ * Recalculate goal saved amount based on linked transactions.
+ * We treat:
+ * - income transactions linked to goal as "contributions"
+ */
+export async function getGoalContributionTotal(goalId: string): Promise<number> {
+  const rows = await runQuery<{ total: number }>(
+    `
+    SELECT COALESCE(SUM(amount), 0) AS total
+    FROM transactions
+    WHERE goal_id = ?
+      AND type = 'income'
+    `,
+    [goalId]
+  );
+
+  return rows[0]?.total ?? 0;
+}
+
+export async function recalculateGoalTotals(goalId: string): Promise<void> {
+  const savedAmount = await getGoalContributionTotal(goalId);
+
+  await runStatement(
+    `
+    UPDATE goals
+    SET saved_amount = ?,
+        updated_at = ?
+    WHERE id = ?
+    `,
+    [savedAmount, new Date().toISOString(), goalId]
+  );
+}
+
+export async function recalculateAllGoalTotals(): Promise<void> {
+  const goals = await getAllGoals();
+  for (const g of goals) {
+    await recalculateGoalTotals(g.id);
+  }
 }
 
 export async function deleteGoal(id: string): Promise<void> {

@@ -1,19 +1,28 @@
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
-import { DB_NAME, CREATE_TABLES_SQL } from './schema';
+import { DB_NAME, CREATE_TABLES_SQL,DROP_TABLES_SQL } from './schema';
 
 let db: SQLite.SQLiteDatabase | null = null;
+let initPromise: Promise<void> | null = null;
+
+const isWeb = Platform.OS === 'web';
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
-  
-  if (Platform.OS === 'web') {
+
+  if (isWeb) {
     console.log('SQLite not supported on web, using mock');
     return null as unknown as SQLite.SQLiteDatabase;
   }
-  
+
   try {
     db = await SQLite.openDatabaseAsync(DB_NAME);
+
+    // Important pragmas for correctness + performance
+    await db.execAsync(`PRAGMA foreign_keys = ON;`);
+    await db.execAsync(`PRAGMA journal_mode = WAL;`);
+    await db.execAsync(`PRAGMA synchronous = NORMAL;`);
+
     console.log('Database opened successfully');
     return db;
   } catch (error) {
@@ -22,41 +31,58 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   }
 }
 
+function splitSqlStatements(sql: string): string[] {
+  return sql
+    .split('\n')
+    .map(line => line.replace(/--.*$/g, '').trim()) // remove inline comments
+    .join('\n')
+    .split(';')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 export async function initializeDatabase(): Promise<void> {
-  if (Platform.OS === 'web') {
+  if (isWeb) {
     console.log('Skipping SQLite init on web');
     return;
   }
-  
-  try {
-    const database = await getDatabase();
-    const statements = CREATE_TABLES_SQL.split(';').filter(s => s.trim());
-    
-    for (const statement of statements) {
-      if (statement.trim()) {
-        await database.execAsync(statement + ';');
-      }
+
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    try {
+      const database = await getDatabase();
+
+      // Ensure FK is on even if DB is reopened
+      await database.execAsync(`PRAGMA foreign_keys = ON;`);
+
+      const statements = splitSqlStatements(CREATE_TABLES_SQL);
+
+      await database.withTransactionAsync(async () => {
+        for (const statement of statements) {
+          await database.execAsync(statement + ';');
+        }
+      });
+
+      console.log('Database tables created successfully');
+    } catch (error) {
+      console.error('Error initializing database:', error);
+      throw error;
     }
-    
-    console.log('Database tables created successfully');
-  } catch (error) {
-    console.error('Error initializing database:', error);
-    throw error;
-  }
+  })();
+
+  return initPromise;
 }
 
 export async function runQuery<T>(
   sql: string,
   params: (string | number | null)[] = []
 ): Promise<T[]> {
-  if (Platform.OS === 'web') {
-    return [];
-  }
-  
+  if (isWeb) return [];
+
   try {
     const database = await getDatabase();
-    const result = await database.getAllAsync<T>(sql, params);
-    return result;
+    return await database.getAllAsync<T>(sql, params);
   } catch (error) {
     console.error('Error running query:', sql, error);
     throw error;
@@ -67,27 +93,49 @@ export async function runStatement(
   sql: string,
   params: (string | number | null)[] = []
 ): Promise<SQLite.SQLiteRunResult> {
-  if (Platform.OS === 'web') {
+  if (isWeb) {
     return { changes: 0, lastInsertRowId: 0 };
   }
-  
+
   try {
     const database = await getDatabase();
-    const result = await database.runAsync(sql, params);
-    return result;
+    return await database.runAsync(sql, params);
   } catch (error) {
     console.error('Error running statement:', sql, error);
     throw error;
   }
 }
 
-export async function runTransaction(
-  callback: () => Promise<void>
-): Promise<void> {
-  if (Platform.OS === 'web') {
-    return;
-  }
-  
+export async function runTransaction(callback: () => Promise<void>): Promise<void> {
+  if (isWeb) return;
+
   const database = await getDatabase();
   await database.withTransactionAsync(callback);
+}
+
+export async function resetDatabase(): Promise<void> {
+  if (isWeb) return;
+
+  const database = await getDatabase();
+
+  const dropStatements = splitSqlStatements(DROP_TABLES_SQL);
+  const createStatements = splitSqlStatements(CREATE_TABLES_SQL);
+
+  await database.withTransactionAsync(async () => {
+    await database.execAsync(`PRAGMA foreign_keys = OFF;`);
+
+    // Drop all tables one-by-one
+    for (const stmt of dropStatements) {
+      await database.execAsync(stmt + ';');
+    }
+
+    // Create all tables one-by-one
+    for (const stmt of createStatements) {
+      await database.execAsync(stmt + ';');
+    }
+
+    await database.execAsync(`PRAGMA foreign_keys = ON;`);
+  });
+
+  console.log('Database reset successfully');
 }

@@ -1,14 +1,27 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { 
-  Building2, PiggyBank, Banknote, CreditCard, Landmark, Wallet, TrendingUp
+import {
+  Building2,
+  PiggyBank,
+  Banknote,
+  CreditCard,
+  Landmark,
+  Wallet,
+  TrendingUp,
 } from 'lucide-react-native';
+
 import Colors from '@/constants/colors';
 import { Account } from '@/types';
 import { formatFullCurrency } from '@/utils/helpers';
 
 const iconMap: Record<string, React.ComponentType<{ size: number; color: string }>> = {
-  Building2, PiggyBank, Banknote, CreditCard, Landmark, Wallet, TrendingUp,
+  Building2,
+  PiggyBank,
+  Banknote,
+  CreditCard,
+  Landmark,
+  Wallet,
+  TrendingUp,
 };
 
 interface AccountCardProps {
@@ -16,15 +29,44 @@ interface AccountCardProps {
   onPress?: () => void;
 }
 
+// ---------------------------
+// CREDIT CARD HELPERS
+// ---------------------------
+function getOutstandingFromBalance(balance: number) {
+  // Outstanding exists only if balance is negative
+  return Math.abs(Math.min(balance, 0));
+}
+
+function getAvailableCredit(limit: number, balance: number) {
+  return Math.max(0, limit - getOutstandingFromBalance(balance));
+}
+
 export default function AccountCard({ account, onPress }: AccountCardProps) {
   const IconComponent = iconMap[account.icon] || Wallet;
+
   const isCreditCard = account.type === 'credit_card';
-  const displayBalance = isCreditCard ? Math.abs(account.balance) : account.balance;
+
+  // For UI display:
+  // - Credit cards show Outstanding (positive number)
+  // - Other accounts show Balance (normal)
+  const displayBalance = isCreditCard ? getOutstandingFromBalance(account.balance) : account.balance;
+
   const balanceLabel = isCreditCard ? 'Outstanding' : 'Balance';
-  
+
+  const creditLimit = account.creditLimit ?? 0;
+
+  const availableCredit = useMemo(() => {
+    if (!isCreditCard) return 0;
+    if (creditLimit <= 0) return 0;
+    return getAvailableCredit(creditLimit, account.balance);
+  }, [isCreditCard, creditLimit, account.balance]);
+
+  // If outstanding > 0, show in expense color
+  const showNegativeStyle = isCreditCard && getOutstandingFromBalance(account.balance) > 0;
+
   return (
-    <TouchableOpacity 
-      style={[styles.container, { borderLeftColor: account.color }]} 
+    <TouchableOpacity
+      style={[styles.container, { borderLeftColor: account.color }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -32,27 +74,26 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
         <View style={[styles.iconContainer, { backgroundColor: account.color + '20' }]}>
           <IconComponent size={20} color={account.color} />
         </View>
+
         <View style={styles.headerText}>
           <Text style={styles.name}>{account.name}</Text>
           <Text style={styles.type}>{account.type.replace('_', ' ').toUpperCase()}</Text>
         </View>
       </View>
+
       <View style={styles.balanceContainer}>
         <Text style={styles.balanceLabel}>{balanceLabel}</Text>
-        <Text style={[
-          styles.balance, 
-          isCreditCard && account.balance < 0 && styles.negativeBalance
-        ]}>
-          {isCreditCard && account.balance < 0 ? '-' : ''}{formatFullCurrency(displayBalance)}
+        <Text style={[styles.balance, showNegativeStyle && styles.negativeBalance]}>
+          {formatFullCurrency(displayBalance)}
         </Text>
       </View>
-      {isCreditCard && account.creditLimit && (
+
+      {isCreditCard && creditLimit > 0 && (
         <View style={styles.limitContainer}>
-          <Text style={styles.limitText}>
-            Limit: {formatFullCurrency(account.creditLimit)}
-          </Text>
-          <Text style={styles.availableText}>
-            Available: {formatFullCurrency(account.creditLimit + account.balance)}
+          <Text style={styles.limitText}>Limit: {formatFullCurrency(creditLimit)}</Text>
+
+          <Text style={[styles.availableText, availableCredit <= 0 && styles.availableDanger]}>
+            Available: {formatFullCurrency(availableCredit)}
           </Text>
         </View>
       )}
@@ -126,5 +167,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.income,
     fontWeight: '500' as const,
+  },
+  availableDanger: {
+    color: Colors.expense,
   },
 });

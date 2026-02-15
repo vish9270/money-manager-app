@@ -19,6 +19,20 @@ interface TransactionRow {
   updated_at: string;
 }
 
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function safeParseTags(value: string | null): string[] | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function mapRowToTransaction(row: TransactionRow): Transaction {
   return {
     id: row.id,
@@ -33,7 +47,7 @@ function mapRowToTransaction(row: TransactionRow): Transaction {
     debtId: row.debt_id ?? undefined,
     investmentId: row.investment_id ?? undefined,
     recurringId: row.recurring_id ?? undefined,
-    tags: row.tags ? JSON.parse(row.tags) : undefined,
+    tags: safeParseTags(row.tags),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -47,10 +61,7 @@ export async function getAllTransactions(): Promise<Transaction[]> {
 }
 
 export async function getTransactionById(id: string): Promise<Transaction | null> {
-  const rows = await runQuery<TransactionRow>(
-    'SELECT * FROM transactions WHERE id = ?',
-    [id]
-  );
+  const rows = await runQuery<TransactionRow>('SELECT * FROM transactions WHERE id = ?', [id]);
   return rows.length > 0 ? mapRowToTransaction(rows[0]) : null;
 }
 
@@ -62,7 +73,10 @@ export async function getTransactionsByMonth(month: string): Promise<Transaction
   return rows.map(mapRowToTransaction);
 }
 
-export async function getTransactionsByDateRange(startDate: string, endDate: string): Promise<Transaction[]> {
+export async function getTransactionsByDateRange(
+  startDate: string,
+  endDate: string
+): Promise<Transaction[]> {
   const rows = await runQuery<TransactionRow>(
     `SELECT * FROM transactions WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC`,
     [startDate, endDate]
@@ -70,10 +84,64 @@ export async function getTransactionsByDateRange(startDate: string, endDate: str
   return rows.map(mapRowToTransaction);
 }
 
+/**
+ * Useful for goal screens
+ */
+export async function getTransactionsByGoalId(goalId: string): Promise<Transaction[]> {
+  const rows = await runQuery<TransactionRow>(
+    `SELECT * FROM transactions WHERE goal_id = ? ORDER BY date DESC, created_at DESC`,
+    [goalId]
+  );
+  return rows.map(mapRowToTransaction);
+}
+
+/**
+ * Useful for investment screens
+ */
+export async function getTransactionsByInvestmentId(investmentId: string): Promise<Transaction[]> {
+  const rows = await runQuery<TransactionRow>(
+    `SELECT * FROM transactions WHERE investment_id = ? ORDER BY date DESC, created_at DESC`,
+    [investmentId]
+  );
+  return rows.map(mapRowToTransaction);
+}
+
+/**
+ * Stats helper:
+ * Returns expense totals grouped by category within a date range.
+ */
+export async function getExpenseTotalsByCategory(
+  startDate: string,
+  endDate: string
+): Promise<{ categoryId: string; total: number }[]> {
+  const rows = await runQuery<{ categoryId: string; total: number }>(
+    `
+    SELECT category_id AS categoryId,
+           COALESCE(SUM(amount), 0) AS total
+    FROM transactions
+    WHERE type = 'expense'
+      AND date >= ?
+      AND date <= ?
+    GROUP BY category_id
+    ORDER BY total DESC
+    `,
+    [startDate, endDate]
+  );
+
+  return rows;
+}
+
 export async function createTransaction(transaction: Transaction): Promise<void> {
   await runStatement(
-    `INSERT INTO transactions (id, type, amount, date, category_id, from_account_id, to_account_id, notes, goal_id, debt_id, investment_id, recurring_id, tags, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `
+    INSERT INTO transactions (
+      id, type, amount, date, category_id,
+      from_account_id, to_account_id,
+      notes, goal_id, debt_id, investment_id, recurring_id,
+      tags, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
     [
       transaction.id,
       transaction.type,
@@ -96,8 +164,23 @@ export async function createTransaction(transaction: Transaction): Promise<void>
 
 export async function updateTransaction(transaction: Transaction): Promise<void> {
   await runStatement(
-    `UPDATE transactions SET type = ?, amount = ?, date = ?, category_id = ?, from_account_id = ?, to_account_id = ?, notes = ?, goal_id = ?, debt_id = ?, investment_id = ?, recurring_id = ?, tags = ?, updated_at = ?
-     WHERE id = ?`,
+    `
+    UPDATE transactions
+    SET type = ?,
+        amount = ?,
+        date = ?,
+        category_id = ?,
+        from_account_id = ?,
+        to_account_id = ?,
+        notes = ?,
+        goal_id = ?,
+        debt_id = ?,
+        investment_id = ?,
+        recurring_id = ?,
+        tags = ?,
+        updated_at = ?
+    WHERE id = ?
+    `,
     [
       transaction.type,
       transaction.amount,
@@ -111,7 +194,7 @@ export async function updateTransaction(transaction: Transaction): Promise<void>
       transaction.investmentId ?? null,
       transaction.recurringId ?? null,
       transaction.tags ? JSON.stringify(transaction.tags) : null,
-      transaction.updatedAt,
+      transaction.updatedAt ?? nowIso(),
       transaction.id,
     ]
   );

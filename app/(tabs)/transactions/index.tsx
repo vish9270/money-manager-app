@@ -1,7 +1,16 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, Text, FlatList, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  Modal,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search, Filter, Plus, X, Calendar, Download } from 'lucide-react-native';
+import { Search, Filter, Plus, X, Calendar } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
@@ -13,14 +22,35 @@ import DatePicker from '@/components/DatePicker';
 
 type FilterType = 'all' | TransactionType;
 
+type ListRow =
+  | { rowType: 'header'; id: string; date: string }
+  | { rowType: 'transaction'; id: string; txn: Transaction };
+
+function getEndOfDayISO(dateStr: string) {
+  // dateStr is YYYY-MM-DD
+  const d = new Date(dateStr + 'T23:59:59.999Z');
+  return d.toISOString();
+}
+
+function getStartOfDayISO(dateStr: string) {
+  const d = new Date(dateStr + 'T00:00:00.000Z');
+  return d.toISOString();
+}
+
 export default function TransactionsScreen() {
   const router = useRouter();
-  const { 
-    transactions, selectedMonth, setSelectedMonth,
-    getCategoryById, getAccountById, deleteTransaction,
-    dateFilter, setDateFilter
+
+  const {
+    transactions,
+    selectedMonth,
+    setSelectedMonth,
+    getCategoryById,
+    getAccountById,
+    deleteTransaction,
+    dateFilter,
+    setDateFilter,
   } = useMoney();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -30,90 +60,136 @@ export default function TransactionsScreen() {
   const [useCustomRange, setUseCustomRange] = useState(false);
 
   const filteredTransactions = useMemo(() => {
+    const searchLower = searchQuery.trim().toLowerCase();
+
+    const startISO =
+      useCustomRange && dateFilter.startDate ? getStartOfDayISO(dateFilter.startDate) : null;
+
+    const endISO =
+      useCustomRange && dateFilter.endDate ? getEndOfDayISO(dateFilter.endDate) : null;
+
     return transactions
       .filter(t => {
-        if (useCustomRange && dateFilter.startDate && dateFilter.endDate) {
-          const txnDate = new Date(t.date);
-          const start = new Date(dateFilter.startDate);
-          const end = new Date(dateFilter.endDate);
-          if (txnDate < start || txnDate > end) return false;
+        // Month vs custom range
+        if (useCustomRange && startISO && endISO) {
+          if (t.date < startISO || t.date > endISO) return false;
         } else {
           const txnMonth = t.date.slice(0, 7);
           if (txnMonth !== selectedMonth) return false;
         }
-        
+
+        // Type filter
         if (filterType !== 'all' && t.type !== filterType) return false;
-        
-        if (searchQuery) {
+
+        // Search
+        if (searchLower) {
           const category = getCategoryById(t.categoryId);
-          const searchLower = searchQuery.toLowerCase();
           const matchesNotes = t.notes?.toLowerCase().includes(searchLower);
-          const matchesCategory = category?.name.toLowerCase().includes(searchLower);
-          const matchesAmount = t.amount.toString().includes(searchQuery);
+          const matchesCategory = category?.name?.toLowerCase().includes(searchLower);
+          const matchesAmount = t.amount.toString().includes(searchQuery.trim());
+
           if (!matchesNotes && !matchesCategory && !matchesAmount) return false;
         }
-        
+
         return true;
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, selectedMonth, filterType, searchQuery, getCategoryById, useCustomRange, dateFilter]);
+      .sort((a, b) => {
+        // ISO string compare is enough, but keeping it safe
+        if (a.date === b.date) return b.createdAt.localeCompare(a.createdAt);
+        return b.date.localeCompare(a.date);
+      });
+  }, [
+    transactions,
+    selectedMonth,
+    filterType,
+    searchQuery,
+    getCategoryById,
+    useCustomRange,
+    dateFilter,
+  ]);
 
-  const groupedTransactions = useMemo(() => {
-    const groups: { date: string; transactions: Transaction[] }[] = [];
+  /**
+   * IMPORTANT:
+   * Instead of nested FlatList / map, we flatten the grouped list into:
+   * Header row + transaction rows.
+   * This keeps virtualization fast.
+   */
+  const flatRows: ListRow[] = useMemo(() => {
+    const rows: ListRow[] = [];
     let currentDate = '';
-    
-    filteredTransactions.forEach(txn => {
+
+    for (const txn of filteredTransactions) {
       const txnDate = txn.date.slice(0, 10);
+
       if (txnDate !== currentDate) {
         currentDate = txnDate;
-        groups.push({ date: txnDate, transactions: [txn] });
-      } else {
-        groups[groups.length - 1].transactions.push(txn);
+        rows.push({
+          rowType: 'header',
+          id: `header_${txnDate}`,
+          date: txnDate,
+        });
       }
-    });
-    
-    return groups;
+
+      rows.push({
+        rowType: 'transaction',
+        id: txn.id,
+        txn,
+      });
+    }
+
+    return rows;
   }, [filteredTransactions]);
 
-  const handleEditTransaction = useCallback((txn: Transaction) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(`/add-transaction?id=${txn.id}`);
-  }, [router]);
+  const handleEditTransaction = useCallback(
+    (txn: Transaction) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push(`/add-transaction?id=${txn.id}`);
+    },
+    [router]
+  );
 
-  const handleDeleteTransaction = useCallback((txn: Transaction) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Delete Transaction',
-      'Are you sure you want to delete this transaction? This will reverse the account balance changes.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => deleteTransaction(txn.id)
-        }
-      ]
-    );
-  }, [deleteTransaction]);
+  const handleDeleteTransaction = useCallback(
+    (txn: Transaction) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-  const handleTransactionPress = useCallback((txn: Transaction) => {
-    Alert.alert(
-      'Transaction Options',
-      'What would you like to do?',
-      [
+      Alert.alert(
+        'Delete Transaction',
+        'Are you sure you want to delete this transaction? This will reverse the account balance changes.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => deleteTransaction(txn.id),
+          },
+        ]
+      );
+    },
+    [deleteTransaction]
+  );
+
+  const handleTransactionPress = useCallback(
+    (txn: Transaction) => {
+      Alert.alert('Transaction Options', 'What would you like to do?', [
         { text: 'Edit', onPress: () => handleEditTransaction(txn) },
         { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTransaction(txn) },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  }, [handleEditTransaction, handleDeleteTransaction]);
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [handleEditTransaction, handleDeleteTransaction]
+  );
 
   const applyDateRange = useCallback(() => {
     if (tempStartDate && tempEndDate) {
-      setDateFilter({
-        startDate: tempStartDate.toISOString().slice(0, 10),
-        endDate: tempEndDate.toISOString().slice(0, 10),
-      });
+      const start = tempStartDate.toISOString().slice(0, 10);
+      const end = tempEndDate.toISOString().slice(0, 10);
+
+      if (start > end) {
+        Alert.alert('Invalid Range', 'Start date must be before end date.');
+        return;
+      }
+
+      setDateFilter({ startDate: start, endDate: end });
       setUseCustomRange(true);
     }
     setShowDateRangeModal(false);
@@ -126,39 +202,47 @@ export default function TransactionsScreen() {
     setTempEndDate(null);
   }, [setDateFilter]);
 
-  const setQuickRange = useCallback((months: number) => {
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - months);
-    setDateFilter({
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
-    });
-    setUseCustomRange(true);
-  }, [setDateFilter]);
+  const setQuickRange = useCallback(
+    (months: number) => {
+      const end = new Date();
+      const start = new Date();
+      start.setMonth(start.getMonth() - months);
 
-  const renderTransaction = useCallback(({ item }: { item: Transaction }) => (
-    <TransactionItem
-      transaction={item}
-      category={getCategoryById(item.categoryId)}
-      fromAccount={item.fromAccountId ? getAccountById(item.fromAccountId) : undefined}
-      toAccount={item.toAccountId ? getAccountById(item.toAccountId) : undefined}
-      onPress={() => handleTransactionPress(item)}
-    />
-  ), [getCategoryById, getAccountById, handleTransactionPress]);
+      setDateFilter({
+        startDate: start.toISOString().slice(0, 10),
+        endDate: end.toISOString().slice(0, 10),
+      });
+      setUseCustomRange(true);
+    },
+    [setDateFilter]
+  );
 
-  const renderGroup = useCallback(({ item }: { item: { date: string; transactions: Transaction[] } }) => (
-    <View style={styles.dateGroup}>
-      <Text style={styles.dateHeader}>{formatShortDate(item.date)}</Text>
-      <View style={styles.transactionsList}>
-        {item.transactions.map(txn => (
-          <View key={txn.id}>
-            {renderTransaction({ item: txn })}
+  const renderRow = useCallback(
+    ({ item }: { item: ListRow }) => {
+      if (item.rowType === 'header') {
+        return (
+          <View style={styles.dateHeaderContainer}>
+            <Text style={styles.dateHeader}>{formatShortDate(item.date)}</Text>
           </View>
-        ))}
-      </View>
-    </View>
-  ), [renderTransaction]);
+        );
+      }
+
+      const txn = item.txn;
+
+      return (
+        <View style={styles.txnRow}>
+          <TransactionItem
+            transaction={txn}
+            category={getCategoryById(txn.categoryId)}
+            fromAccount={txn.fromAccountId ? getAccountById(txn.fromAccountId) : undefined}
+            toAccount={txn.toAccountId ? getAccountById(txn.toAccountId) : undefined}
+            onPress={() => handleTransactionPress(txn)}
+          />
+        </View>
+      );
+    },
+    [getCategoryById, getAccountById, handleTransactionPress]
+  );
 
   const filterButtons: { type: FilterType; label: string; color: string }[] = [
     { type: 'all', label: 'All', color: Colors.primary },
@@ -181,7 +265,7 @@ export default function TransactionsScreen() {
           </TouchableOpacity>
         </View>
       )}
-      
+
       <View style={styles.searchRow}>
         <View style={styles.searchContainer}>
           <Search size={18} color={Colors.textMuted} />
@@ -198,13 +282,15 @@ export default function TransactionsScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.filterButton, showFilters && styles.filterButtonActive]}
           onPress={() => setShowFilters(!showFilters)}
         >
           <Filter size={18} color={showFilters ? Colors.textInverse : Colors.primary} />
         </TouchableOpacity>
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.filterButton, useCustomRange && styles.filterButtonActive]}
           onPress={() => setShowDateRangeModal(true)}
         >
@@ -219,17 +305,19 @@ export default function TransactionsScreen() {
               key={btn.type}
               style={[
                 styles.filterChip,
-                filterType === btn.type && { backgroundColor: btn.color }
+                filterType === btn.type && { backgroundColor: btn.color },
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setFilterType(btn.type);
               }}
             >
-              <Text style={[
-                styles.filterChipText,
-                filterType === btn.type && styles.filterChipTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  filterType === btn.type && styles.filterChipTextActive,
+                ]}
+              >
                 {btn.label}
               </Text>
             </TouchableOpacity>
@@ -238,24 +326,28 @@ export default function TransactionsScreen() {
       )}
 
       <FlatList
-        data={groupedTransactions}
-        renderItem={renderGroup}
-        keyExtractor={item => item.date}
+        data={flatRows}
+        renderItem={renderRow}
+        keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews
+        maxToRenderPerBatch={10}
+        initialNumToRender={12}
+        windowSize={10}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No transactions found</Text>
             <Text style={styles.emptySubtitle}>
-              {searchQuery || filterType !== 'all' 
-                ? 'Try adjusting your filters' 
+              {searchQuery || filterType !== 'all'
+                ? 'Try adjusting your filters'
                 : 'Add your first transaction to get started'}
             </Text>
           </View>
         }
       />
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -276,13 +368,33 @@ export default function TransactionsScreen() {
             </View>
 
             <View style={styles.quickFilters}>
-              <TouchableOpacity style={styles.quickFilterButton} onPress={() => { setQuickRange(3); setShowDateRangeModal(false); }}>
+              <TouchableOpacity
+                style={styles.quickFilterButton}
+                onPress={() => {
+                  setQuickRange(3);
+                  setShowDateRangeModal(false);
+                }}
+              >
                 <Text style={styles.quickFilterText}>Last 3 Months</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickFilterButton} onPress={() => { setQuickRange(6); setShowDateRangeModal(false); }}>
+
+              <TouchableOpacity
+                style={styles.quickFilterButton}
+                onPress={() => {
+                  setQuickRange(6);
+                  setShowDateRangeModal(false);
+                }}
+              >
                 <Text style={styles.quickFilterText}>Last 6 Months</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickFilterButton} onPress={() => { setQuickRange(12); setShowDateRangeModal(false); }}>
+
+              <TouchableOpacity
+                style={styles.quickFilterButton}
+                onPress={() => {
+                  setQuickRange(12);
+                  setShowDateRangeModal(false);
+                }}
+              >
                 <Text style={styles.quickFilterText}>Last Year</Text>
               </TouchableOpacity>
             </View>
@@ -306,9 +418,16 @@ export default function TransactionsScreen() {
             </View>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.clearButton} onPress={() => { clearDateRange(); setShowDateRangeModal(false); }}>
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={() => {
+                  clearDateRange();
+                  setShowDateRangeModal(false);
+                }}
+              >
                 <Text style={styles.clearButtonText}>Clear Filter</Text>
               </TouchableOpacity>
+
               <TouchableOpacity style={styles.applyButton} onPress={applyDateRange}>
                 <Text style={styles.applyButtonText}>Apply</Text>
               </TouchableOpacity>
@@ -325,6 +444,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+
   dateRangeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -339,6 +459,7 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: Colors.textInverse,
   },
+
   searchRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -360,6 +481,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.text,
   },
+
   filterButton: {
     width: 44,
     height: 44,
@@ -371,6 +493,7 @@ const styles = StyleSheet.create({
   filterButtonActive: {
     backgroundColor: Colors.primary,
   },
+
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -391,23 +514,27 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: Colors.textInverse,
   },
+
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
-  dateGroup: {
-    marginBottom: 16,
+
+  dateHeaderContainer: {
+    paddingTop: 10,
+    paddingBottom: 8,
   },
   dateHeader: {
     fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.textSecondary,
-    marginBottom: 8,
     marginLeft: 4,
   },
-  transactionsList: {
-    gap: 8,
+
+  txnRow: {
+    marginBottom: 8,
   },
+
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -423,6 +550,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
   },
+
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -439,6 +567,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -462,6 +591,7 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: Colors.text,
   },
+
   quickFilters: {
     flexDirection: 'row',
     gap: 8,
@@ -479,15 +609,18 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
     color: Colors.text,
   },
+
   orText: {
     textAlign: 'center',
     color: Colors.textMuted,
     fontSize: 12,
     marginVertical: 16,
   },
+
   datePickerSection: {
     marginBottom: 16,
   },
+
   modalActions: {
     flexDirection: 'row',
     gap: 12,

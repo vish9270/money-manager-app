@@ -1,335 +1,398 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Plus, TrendingUp, TrendingDown, Wallet, X, Edit2, Trash2 } from 'lucide-react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { Plus, X, AlertTriangle, CheckCircle, TrendingUp } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
-import { formatFullCurrency, formatCurrency } from '@/utils/helpers';
-import { Account, AccountType } from '@/types';
-import AccountCard from '@/components/AccountCard';
+import { formatCurrency, getMonthYear } from '@/utils/helpers';
+import { Category, BudgetLine } from '@/types';
 
-const accountTypes: { value: AccountType; label: string }[] = [
-  { value: 'savings', label: 'Savings' },
-  { value: 'checking', label: 'Checking' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'wallet', label: 'Wallet' },
-  { value: 'investment', label: 'Investment' },
-  { value: 'loan', label: 'Loan' },
-];
+import MonthSelector from '@/components/MonthSelector';
+import BudgetCard from '@/components/BudgetCard';
+import ProgressBar from '@/components/ProgressBar';
+import SearchablePicker from '@/components/SearchablePicker';
 
-const accountColors = [
-  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
-  '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
-];
+export default function BudgetsScreen() {
+  const {
+    selectedMonth,
+    setSelectedMonth,
+    budgets,
+    categories,
+    getMonthlyStats,
+    addBudget,
+    updateBudget,
+    deleteBudgetLine,
+    getCategoryById,
+  } = useMoney();
 
-export default function AccountsScreen() {
-  const router = useRouter();
-  const { accounts, addAccount, updateAccount, deleteAccount, checkAccountHasTransactions, getTotalNetWorth } = useMoney();
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
-  const [showModal, setShowModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [plannedAmount, setPlannedAmount] = useState('');
+  const [alertThreshold, setAlertThreshold] = useState('80');
 
-  const [name, setName] = useState('');
-  const [type, setType] = useState<AccountType>('savings');
-  const [balance, setBalance] = useState('');
-  const [creditLimit, setCreditLimit] = useState('');
-  const [selectedColor, setSelectedColor] = useState(accountColors[0]);
+  const [editingLine, setEditingLine] = useState<BudgetLine | null>(null);
 
-  const groupedAccounts = useMemo(() => {
-    const groups = {
-      bank: accounts.filter(a => a.type === 'savings' || a.type === 'checking'),
-      cash: accounts.filter(a => a.type === 'cash' || a.type === 'wallet'),
-      credit: accounts.filter(a => a.type === 'credit_card'),
-      investment: accounts.filter(a => a.type === 'investment'),
-      loan: accounts.filter(a => a.type === 'loan'),
-    };
-    return groups;
-  }, [accounts]);
+  const currentBudget = useMemo(() => {
+    return budgets.find(b => b.month === selectedMonth);
+  }, [budgets, selectedMonth]);
 
-  const totalAssets = useMemo(() => {
-    return accounts
-      .filter(a => a.balance > 0)
-      .reduce((sum, a) => sum + a.balance, 0);
-  }, [accounts]);
+  const stats = useMemo(() => getMonthlyStats(selectedMonth), [selectedMonth, getMonthlyStats]);
 
-  const totalLiabilities = useMemo(() => {
-    return accounts
-      .filter(a => a.balance < 0)
-      .reduce((sum, a) => sum + Math.abs(a.balance), 0);
-  }, [accounts]);
+  const budgetData = useMemo(() => {
+    if (!currentBudget) return [];
+
+    return currentBudget.lines
+      .map(line => {
+        const spent = stats.categoryBreakdown.find(c => c.categoryId === line.categoryId)?.amount || 0;
+        return { line, spent };
+      })
+      .sort((a, b) => b.spent - a.spent);
+  }, [currentBudget, stats.categoryBreakdown]);
+
+  const totalPlanned = useMemo(() => {
+    return currentBudget?.lines.reduce((sum, l) => sum + l.planned, 0) || 0;
+  }, [currentBudget]);
+
+  const totalSpent = stats.totalExpense;
+
+  const budgetProgress = totalPlanned > 0 ? (totalSpent / totalPlanned) * 100 : 0;
+  const isOverBudget = totalSpent > totalPlanned && totalPlanned > 0;
+
+  const expenseCategories = useMemo(() => {
+    return categories.filter(c => c.type === 'expense' || c.type === 'both');
+  }, [categories]);
+
+  const availableCategories = useMemo(() => {
+    const usedIds = currentBudget?.lines.map(l => l.categoryId) || [];
+    return expenseCategories.filter(c => !usedIds.includes(c.id));
+  }, [expenseCategories, currentBudget]);
+
+  const categoryItems = useMemo(
+    () => availableCategories.map(c => ({ id: c.id, name: c.name, color: c.color })),
+    [availableCategories]
+  );
 
   const resetForm = () => {
-    setName('');
-    setType('savings');
-    setBalance('');
-    setCreditLimit('');
-    setSelectedColor(accountColors[0]);
-    setEditingAccount(null);
-    setIsEditing(false);
+    setSelectedCategoryId('');
+    setPlannedAmount('');
+    setAlertThreshold('80');
+    setEditingLine(null);
   };
 
-  const openEditModal = useCallback((account: Account) => {
-    setEditingAccount(account);
-    setIsEditing(true);
-    setName(account.name);
-    setType(account.type);
-    setBalance(account.balance.toString());
-    setCreditLimit(account.creditLimit?.toString() || '');
-    setSelectedColor(account.color);
-    setShowModal(true);
-  }, []);
+  const handleCreateBudgetIfMissing = () => {
+    if (currentBudget) return;
 
-  const handleSubmit = () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter an account name');
+    addBudget({
+      month: selectedMonth,
+      status: 'active',
+      lines: [],
+    });
+  };
+
+  const handleAddBudgetLine = () => {
+    if (!selectedCategoryId || !plannedAmount) {
+      Alert.alert('Error', 'Please select a category and enter an amount');
       return;
     }
 
-    const balanceNum = parseFloat(balance) || 0;
-    const creditLimitNum = creditLimit ? parseFloat(creditLimit) : undefined;
-
-    const accountData = {
-      name: name.trim(),
-      type,
-      balance: balanceNum,
-      creditLimit: type === 'credit_card' ? creditLimitNum : undefined,
-      icon: type === 'credit_card' ? 'CreditCard' : type === 'cash' ? 'Banknote' : 'Building2',
-      color: selectedColor,
-      isActive: true,
-    };
-
-    if (isEditing && editingAccount) {
-      updateAccount({
-        ...editingAccount,
-        ...accountData,
-      });
-    } else {
-      addAccount(accountData);
+    const amount = parseFloat(plannedAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
     }
 
+    const threshold = Math.min(Math.max(parseFloat(alertThreshold) || 80, 1), 100);
+
+    const newLine: BudgetLine = {
+      id: `bl_${Date.now()}`,
+      categoryId: selectedCategoryId,
+      planned: amount,
+      alertThreshold: threshold,
+    };
+
+    const existingLines = currentBudget?.lines || [];
+
+    addBudget({
+      month: selectedMonth,
+      status: 'active',
+      lines: [...existingLines, newLine],
+    });
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowModal(false);
+    setShowAddModal(false);
     resetForm();
   };
 
-  const handleDelete = useCallback((account: Account) => {
-    const hasTransactions = checkAccountHasTransactions(account.id);
-    
-    if (hasTransactions) {
-      Alert.alert(
-        'Cannot Delete',
-        'This account has transactions associated with it. Please delete or reassign those transactions first.',
-        [{ text: 'OK' }]
-      );
+  const openEditModal = useCallback((line: BudgetLine) => {
+    setEditingLine(line);
+    setPlannedAmount(line.planned.toString());
+    setAlertThreshold(line.alertThreshold.toString());
+    setShowEditModal(true);
+  }, []);
+
+  const handleEditBudgetLine = () => {
+    if (!editingLine || !plannedAmount || !currentBudget) {
+      Alert.alert('Error', 'Please enter an amount');
       return;
     }
 
-    Alert.alert(
-      'Delete Account',
-      `Are you sure you want to delete "${account.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteAccount(account.id);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        }
-      ]
-    );
-  }, [deleteAccount, checkAccountHasTransactions]);
+    const amount = parseFloat(plannedAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
 
-  const handleAccountPress = useCallback((account: Account) => {
-    Alert.alert(
-      account.name,
-      'What would you like to do?',
-      [
-        { text: 'Edit', onPress: () => openEditModal(account) },
-        { text: 'Delete', style: 'destructive', onPress: () => handleDelete(account) },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  }, [openEditModal, handleDelete]);
+    const threshold = Math.min(Math.max(parseFloat(alertThreshold) || 80, 1), 100);
 
-  const renderAccountGroup = (title: string, accountsList: typeof accounts) => {
-    if (accountsList.length === 0) return null;
-    
-    const groupTotal = accountsList.reduce((sum, a) => sum + a.balance, 0);
-    
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={[
-            styles.sectionTotal,
-            groupTotal < 0 && styles.negativeTotalText
-          ]}>
-            {groupTotal < 0 ? '-' : ''}{formatCurrency(Math.abs(groupTotal))}
-          </Text>
-        </View>
-        <View style={styles.accountsList}>
-          {accountsList.map(account => (
-            <TouchableOpacity key={account.id} onPress={() => handleAccountPress(account)}>
-              <AccountCard 
-                account={account}
-                onPress={() => handleAccountPress(account)}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+    const updatedLines = currentBudget.lines.map(l =>
+      l.id === editingLine.id ? { ...l, planned: amount, alertThreshold: threshold } : l
     );
+
+    updateBudget({
+      ...currentBudget,
+      lines: updatedLines,
+    });
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowEditModal(false);
+    resetForm();
+  };
+
+  const handleDeleteBudgetLine = (lineId: string) => {
+    if (!currentBudget) return;
+
+    Alert.alert('Delete Budget Line', 'Remove this category from the budget?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deleteBudgetLine({ budgetId: currentBudget.id, lineId });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
+      },
+    ]);
   };
 
   return (
     <View style={styles.container}>
+      <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.summarySection}>
-          <View style={styles.netWorthCard}>
-            <Wallet size={20} color={Colors.accent} />
-            <Text style={styles.netWorthLabel}>Net Worth</Text>
-            <Text style={[
-              styles.netWorthValue,
-              getTotalNetWorth < 0 && styles.negativeValue
-            ]}>
-              {formatFullCurrency(getTotalNetWorth)}
-            </Text>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryHeader}>
+            <Text style={styles.summaryTitle}>Monthly Budget</Text>
+
+            {currentBudget && (
+              <View style={[styles.statusBadge, isOverBudget && styles.statusBadgeOver]}>
+                {isOverBudget ? (
+                  <AlertTriangle size={12} color={Colors.expense} />
+                ) : (
+                  <CheckCircle size={12} color={Colors.income} />
+                )}
+                <Text style={[styles.statusText, isOverBudget && styles.statusTextOver]}>
+                  {isOverBudget ? 'Over Budget' : 'On Track'}
+                </Text>
+              </View>
+            )}
           </View>
-          
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryCard}>
-              <TrendingUp size={16} color={Colors.income} />
-              <Text style={styles.summaryLabel}>Assets</Text>
-              <Text style={styles.summaryValue}>{formatCurrency(totalAssets)}</Text>
-            </View>
-            <View style={styles.summaryCard}>
-              <TrendingDown size={16} color={Colors.expense} />
-              <Text style={styles.summaryLabel}>Liabilities</Text>
-              <Text style={[styles.summaryValue, styles.liabilityValue]}>
-                {formatCurrency(totalLiabilities)}
+
+          {currentBudget ? (
+            <>
+              <View style={styles.progressSection}>
+                <ProgressBar progress={budgetProgress} height={10} showOverspend />
+                <View style={styles.progressLabels}>
+                  <Text style={styles.spentLabel}>
+                    <Text style={styles.spentValue}>{formatCurrency(totalSpent)}</Text> spent
+                  </Text>
+                  <Text style={styles.plannedLabel}>of {formatCurrency(totalPlanned)}</Text>
+                </View>
+              </View>
+
+              <View style={styles.summaryStats}>
+                <View style={styles.summaryStatItem}>
+                  <Text style={styles.statValue}>{Math.round(budgetProgress)}%</Text>
+                  <Text style={styles.statLabel}>Used</Text>
+                </View>
+
+                <View style={styles.summaryStatItem}>
+                  <Text style={[styles.statValue, totalPlanned - totalSpent < 0 && styles.negativeValue]}>
+                    {formatCurrency(Math.abs(totalPlanned - totalSpent))}
+                  </Text>
+                  <Text style={styles.statLabel}>
+                    {totalSpent > totalPlanned ? 'Over' : 'Remaining'}
+                  </Text>
+                </View>
+
+                <View style={styles.summaryStatItem}>
+                  <Text style={styles.statValue}>{budgetData.length}</Text>
+                  <Text style={styles.statLabel}>Categories</Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={styles.noBudget}>
+              <TrendingUp size={32} color={Colors.textMuted} />
+              <Text style={styles.noBudgetText}>
+                No budget for {getMonthYear(`${selectedMonth}-01`)}
               </Text>
+              <Text style={styles.noBudgetSubtext}>Create a budget to track your spending</Text>
             </View>
-          </View>
+          )}
         </View>
 
-        {renderAccountGroup('Bank Accounts', groupedAccounts.bank)}
-        {renderAccountGroup('Cash & Wallets', groupedAccounts.cash)}
-        {renderAccountGroup('Credit Cards', groupedAccounts.credit)}
-        {renderAccountGroup('Investment Accounts', groupedAccounts.investment)}
-        {renderAccountGroup('Loans', groupedAccounts.loan)}
+        {budgetData.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Category Budgets</Text>
 
-        <Text style={styles.hintText}>Tap on an account to edit or delete</Text>
+            <View style={styles.budgetList}>
+              {budgetData.map(({ line, spent }) => (
+                <TouchableOpacity
+                  key={line.id}
+                  onPress={() => openEditModal(line)}
+                  onLongPress={() => handleDeleteBudgetLine(line.id)}
+                >
+                  <BudgetCard line={line} category={getCategoryById(line.categoryId)} spent={spent} />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.hintText}>Tap to edit, long press to delete</Text>
+          </View>
+        )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          resetForm();
-          setShowModal(true);
+
+          handleCreateBudgetIfMissing();
+          setShowAddModal(true);
         }}
       >
         <Plus size={24} color={Colors.textInverse} />
       </TouchableOpacity>
 
-      <Modal visible={showModal} animationType="slide" transparent>
-        <KeyboardAvoidingView 
+      {/* Add Budget Line Modal */}
+      <Modal visible={showAddModal} animationType="slide" transparent>
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{isEditing ? 'Edit Account' : 'Add Account'}</Text>
-                <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
-                  <X size={24} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.inputLabel}>Account Name</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., HDFC Savings"
-                placeholderTextColor={Colors.textMuted}
-                value={name}
-                onChangeText={setName}
-              />
-
-              <Text style={styles.inputLabel}>Account Type</Text>
-              <View style={styles.typeGrid}>
-                {accountTypes.map(t => (
-                  <TouchableOpacity
-                    key={t.value}
-                    style={[
-                      styles.typeChip,
-                      type === t.value && styles.typeChipActive
-                    ]}
-                    onPress={() => setType(t.value)}
-                  >
-                    <Text style={[
-                      styles.typeChipText,
-                      type === t.value && styles.typeChipTextActive
-                    ]}>
-                      {t.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.inputLabel}>Current Balance (₹)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="numeric"
-                value={balance}
-                onChangeText={setBalance}
-              />
-              {type === 'credit_card' && (
-                <Text style={styles.hintInputText}>Use negative for outstanding due</Text>
-              )}
-
-              {type === 'credit_card' && (
-                <>
-                  <Text style={styles.inputLabel}>Credit Limit (₹)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="200000"
-                    placeholderTextColor={Colors.textMuted}
-                    keyboardType="numeric"
-                    value={creditLimit}
-                    onChangeText={setCreditLimit}
-                  />
-                </>
-              )}
-
-              <Text style={styles.inputLabel}>Color</Text>
-              <View style={styles.colorGrid}>
-                {accountColors.map(color => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      styles.colorChip,
-                      { backgroundColor: color },
-                      selectedColor === color && styles.colorChipSelected
-                    ]}
-                    onPress={() => setSelectedColor(color)}
-                  />
-                ))}
-              </View>
-
-              <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                <Text style={styles.submitButtonText}>{isEditing ? 'Save Changes' : 'Add Account'}</Text>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Budget Category</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowAddModal(false);
+                  resetForm();
+                }}
+              >
+                <X size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
-          </ScrollView>
+
+            <View style={styles.inputSection}>
+              <SearchablePicker
+                items={categoryItems}
+                selectedId={selectedCategoryId}
+                onSelect={setSelectedCategoryId}
+                label="Category"
+                placeholder="Select a category"
+                searchPlaceholder="Search categories..."
+              />
+            </View>
+
+            <Text style={styles.inputLabel}>Planned Amount (₹)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="10000"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              value={plannedAmount}
+              onChangeText={setPlannedAmount}
+            />
+
+            <Text style={styles.inputLabel}>Alert Threshold (%)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="80"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              value={alertThreshold}
+              onChangeText={setAlertThreshold}
+            />
+
+            <TouchableOpacity style={styles.addButton} onPress={handleAddBudgetLine}>
+              <Text style={styles.addButtonText}>Add to Budget</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Edit Budget Line Modal */}
+      <Modal visible={showEditModal} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Edit {editingLine ? getCategoryById(editingLine.categoryId)?.name : ''} Budget
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowEditModal(false);
+                  resetForm();
+                }}
+              >
+                <X size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Planned Amount (₹)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="10000"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              value={plannedAmount}
+              onChangeText={setPlannedAmount}
+              autoFocus
+            />
+
+            <Text style={styles.inputLabel}>Alert Threshold (%)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="80"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              value={alertThreshold}
+              onChangeText={setAlertThreshold}
+            />
+
+            <TouchableOpacity style={styles.addButton} onPress={handleEditBudgetLine}>
+              <Text style={styles.addButtonText}>Save Changes</Text>
+            </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -337,94 +400,83 @@ export default function AccountsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  summarySection: {
-    padding: 16,
-    gap: 12,
-  },
-  netWorthCard: {
+  container: { flex: 1, backgroundColor: Colors.background },
+
+  summaryCard: {
     backgroundColor: Colors.surface,
+    marginHorizontal: 16,
+    marginTop: 8,
     borderRadius: 16,
     padding: 20,
-    alignItems: 'center',
-    gap: 8,
   },
-  netWorthLabel: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  netWorthValue: {
-    fontSize: 32,
-    fontWeight: '700' as const,
-    color: Colors.text,
-  },
-  negativeValue: {
-    color: Colors.expense,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    gap: 4,
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: Colors.text,
-  },
-  liabilityValue: {
-    color: Colors.expense,
-  },
-  section: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  sectionHeader: {
+
+  summaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: Colors.textSecondary,
-  },
-  sectionTotal: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: Colors.text,
-  },
-  negativeTotalText: {
-    color: Colors.expense,
-  },
-  accountsList: {
-    gap: 10,
-  },
-  hintText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    marginTop: 8,
     marginBottom: 16,
   },
-  bottomPadding: {
-    height: 100,
+
+  summaryTitle: { fontSize: 18, fontWeight: '600', color: Colors.text },
+
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.incomeLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
+
+  statusBadgeOver: { backgroundColor: Colors.expenseLight },
+
+  statusText: { fontSize: 12, fontWeight: '500', color: Colors.income },
+
+  statusTextOver: { color: Colors.expense },
+
+  progressSection: { gap: 8 },
+
+  progressLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+
+  spentLabel: { fontSize: 13, color: Colors.textSecondary },
+
+  spentValue: { fontWeight: '600', color: Colors.text },
+
+  plannedLabel: { fontSize: 13, color: Colors.textMuted },
+
+  summaryStats: {
+    flexDirection: 'row',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+
+  summaryStatItem: { flex: 1, alignItems: 'center' },
+
+  statValue: { fontSize: 18, fontWeight: '700', color: Colors.text },
+
+  negativeValue: { color: Colors.expense },
+
+  statLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+
+  noBudget: { alignItems: 'center', paddingVertical: 30, gap: 8 },
+
+  noBudgetText: { fontSize: 15, fontWeight: '500', color: Colors.text },
+
+  noBudgetSubtext: { fontSize: 13, color: Colors.textSecondary },
+
+  section: { marginTop: 24, paddingHorizontal: 16 },
+
+  sectionTitle: { fontSize: 15, fontWeight: '600', color: Colors.textSecondary, marginBottom: 12 },
+
+  budgetList: { gap: 10 },
+
+  hintText: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: 12 },
+
+  bottomPadding: { height: 100 },
+
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -441,40 +493,40 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
-  modalScroll: {
-    flex: 1,
-    marginTop: 80,
-  },
+
   modalContent: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
-    minHeight: 500,
   },
+
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600' as const,
-    color: Colors.text,
-  },
+
+  modalTitle: { fontSize: 18, fontWeight: '600', color: Colors.text },
+
+  inputSection: { marginBottom: 16 },
+
   inputLabel: {
     fontSize: 13,
-    fontWeight: '500' as const,
+    fontWeight: '500',
     color: Colors.textSecondary,
     marginBottom: 8,
     marginTop: 16,
   },
+
   input: {
     backgroundColor: Colors.surfaceAlt,
     borderRadius: 12,
@@ -482,57 +534,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.text,
   },
-  hintInputText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 4,
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  typeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.surfaceAlt,
-  },
-  typeChipActive: {
-    backgroundColor: Colors.accent,
-  },
-  typeChipText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  typeChipTextActive: {
-    color: Colors.textInverse,
-    fontWeight: '500' as const,
-  },
-  colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  colorChip: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  colorChipSelected: {
-    borderWidth: 3,
-    borderColor: Colors.text,
-  },
-  submitButton: {
+
+  addButton: {
     backgroundColor: Colors.accent,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     marginTop: 24,
   },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.textInverse,
-  },
+
+  addButtonText: { fontSize: 16, fontWeight: '600', color: Colors.textInverse },
 });

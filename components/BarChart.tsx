@@ -1,40 +1,63 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import Colors from '@/constants/colors';
 
 interface BarChartProps {
-  data: { label: string; income: number; expense: number }[];
+  data?: { label: string; income: number; expense: number }[];
   height?: number;
 }
 
-export default function BarChart({ data, height = 140 }: BarChartProps) {
-  const maxValue = Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
-  
+export default function BarChart({ data = [], height = 140 }: BarChartProps) {
+
+  const safeData = Array.isArray(data) ? data : [];
+
+  const maxValue = useMemo(() => {
+    if (safeData.length === 0) return 1;
+
+    const allValues = safeData.flatMap(d => [
+      Number(d.income || 0),
+      Number(d.expense || 0),
+    ]);
+
+    return Math.max(...allValues, 1);
+  }, [safeData]);
+
+  if (safeData.length === 0) {
+    return (
+      <View style={[styles.container, { height: height + 30 }]}>
+        <View style={[styles.emptyBox, { height }]}>
+          <Text style={styles.emptyText}>No data</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={[styles.chartArea, { height }]}>
-        {data.map((item, index) => (
+        {safeData.map((item, index) => (
           <View key={index} style={styles.barGroup}>
             <View style={styles.barsContainer}>
-              <View 
+              <View
                 style={[
-                  styles.bar, 
+                  styles.bar,
                   styles.incomeBar,
-                  { height: (item.income / maxValue) * height }
-                ]} 
+                  { height: (item.income / maxValue) * height },
+                ]}
               />
-              <View 
+              <View
                 style={[
-                  styles.bar, 
+                  styles.bar,
                   styles.expenseBar,
-                  { height: (item.expense / maxValue) * height }
-                ]} 
+                  { height: (item.expense / maxValue) * height },
+                ]}
               />
             </View>
             <Text style={styles.label}>{item.label}</Text>
           </View>
         ))}
       </View>
+
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: Colors.income }]} />
@@ -52,6 +75,16 @@ export default function BarChart({ data, height = 140 }: BarChartProps) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+  },
+  emptyBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: Colors.textMuted,
   },
   chartArea: {
     flexDirection: 'row',
