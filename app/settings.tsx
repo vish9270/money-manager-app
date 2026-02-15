@@ -37,7 +37,6 @@ const categoryColors = [
 ];
 
 export default function SettingsScreen() {
-  console.log('SETTINGS SCREEN LOADED: app/settings.tsx');
 
   const router = useRouter();
 

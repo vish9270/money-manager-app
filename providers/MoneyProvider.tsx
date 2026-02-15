@@ -14,22 +14,14 @@ import {
   MonthlyStats,
   Alert,
   UserSettings,
+  AccountType,
 } from '@/types';
 
-import {
-  defaultCategories,
-  sampleAccounts,
-  sampleTransactions,
-  sampleBudget,
-  sampleGoals,
-  sampleRecurring,
-  sampleDebts,
-  sampleInvestments,
-} from '@/mocks/sampleData';
+import { defaultCategories } from '@/mocks/sampleData';
 
 import { generateId, getMonthKey, getStartOfMonth, getEndOfMonth } from '@/utils/helpers';
 
-import { initializeDatabase, runTransaction,resetDatabase } from '@/db/repositories/database';
+import { initializeDatabase, runTransaction, resetDatabase } from '@/db/repositories/database';
 
 import * as accountRepo from '@/db/repositories/accountRepository';
 import * as categoryRepo from '@/db/repositories/categoryRepository';
@@ -51,9 +43,9 @@ const defaultSettings: UserSettings = {
   isOnboarded: true,
 };
 
-/**
- * Helper: YYYY-MM-DD -> ISO start/end day.
- */
+// ---------------------------
+// DATE HELPERS
+// ---------------------------
 function startOfDayISO(dateStr: string) {
   return new Date(dateStr + 'T00:00:00.000Z').toISOString();
 }
@@ -63,33 +55,117 @@ function endOfDayISO(dateStr: string) {
 function toDateKey(d: Date): string {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
-
 function parseDateKey(dateKey: string): Date {
   const [y, m, d] = dateKey.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
+// ---------------------------
+// CREDIT CARD HELPERS
+// ---------------------------
+function isLiabilityAccountType(type: AccountType) {
+  return type === 'credit_card' || type === 'loan';
+}
+
+function isCreditCardAccount(account?: Account | null) {
+  return account?.type === 'credit_card';
+}
+
 /**
- * Compute next run date based on frequency.
- * Returns YYYY-MM-DD.
+ * Stored rule:
+ * - credit cards store outstanding as NEGATIVE
+ * - loans store outstanding as NEGATIVE
  */
+function getOutstandingFromBalance(balance: number) {
+  return Math.abs(Math.min(balance, 0));
+}
+
+function getAvailableCredit(limit: number, balance: number) {
+  return Math.max(0, limit - getOutstandingFromBalance(balance));
+}
+
+/**
+ * Rule:
+ * - For credit cards, limit must always exist (>0)
+ * - Spending cannot exceed available credit
+ * - Paying cannot exceed outstanding due
+ */
+function assertCreditCardRules(params: {
+  txn: Transaction;
+  fromAccount?: Account | null;
+  toAccount?: Account | null;
+}) {
+  const { txn, fromAccount, toAccount } = params;
+
+  // 1) Spending on credit card (expense)
+  if (txn.type === 'expense' && isCreditCardAccount(fromAccount)) {
+    if (!fromAccount) return;
+
+    const limit = fromAccount.creditLimit ?? 0;
+
+    if (limit <= 0) {
+      throw new Error('Credit card limit is required.');
+    }
+
+    const currentOutstanding = getOutstandingFromBalance(fromAccount.balance);
+    const available = getAvailableCredit(limit, fromAccount.balance);
+
+    if (txn.amount > available) {
+      throw new Error(
+        `Credit limit exceeded. Available: ₹${available.toFixed(
+          0
+        )}, trying to spend: ₹${txn.amount.toFixed(0)}`
+      );
+    }
+
+    const newOutstanding = currentOutstanding + txn.amount;
+    if (newOutstanding > limit) {
+      throw new Error(
+        `Credit limit exceeded. Outstanding would become ₹${newOutstanding.toFixed(
+          0
+        )} (limit ₹${limit.toFixed(0)})`
+      );
+    }
+  }
+
+  // 2) Paying credit card (transfer into credit card)
+  // Savings -> Credit Card
+  if (txn.type === 'transfer' && isCreditCardAccount(toAccount)) {
+    if (!toAccount) return;
+
+    const outstanding = getOutstandingFromBalance(toAccount.balance);
+
+    if (outstanding <= 0) {
+      throw new Error('This credit card has no outstanding due to pay.');
+    }
+
+    if (txn.amount > outstanding) {
+      throw new Error(
+        `Payment exceeds outstanding due. Due: ₹${outstanding.toFixed(
+          0
+        )}, trying to pay: ₹${txn.amount.toFixed(0)}`
+      );
+    }
+  }
+}
+
+// ---------------------------
+// RECURRING NEXT RUN
+// ---------------------------
 function computeNextRunDate(rec: Recurring, currentRunDate: string): string {
   const current = parseDateKey(currentRunDate);
   const next = new Date(current);
 
   switch (rec.frequency) {
-    case 'daily': {
+    case 'daily':
       next.setDate(next.getDate() + 1);
       break;
-    }
 
-    case 'weekly': {
+    case 'weekly':
       next.setDate(next.getDate() + 7);
       break;
-    }
 
     case 'monthly': {
-      // If dayOfMonth is set, keep it stable.
       if (rec.dayOfMonth) {
         const y = next.getFullYear();
         const m = next.getMonth() + 1;
@@ -104,15 +180,13 @@ function computeNextRunDate(rec: Recurring, currentRunDate: string): string {
       break;
     }
 
-    case 'quarterly': {
+    case 'quarterly':
       next.setMonth(next.getMonth() + 3);
       break;
-    }
 
-    case 'yearly': {
+    case 'yearly':
       next.setFullYear(next.getFullYear() + 1);
       break;
-    }
 
     default:
       next.setMonth(next.getMonth() + 1);
@@ -127,52 +201,34 @@ export const [MoneyProvider, useMoney] = createContextHook(() => {
   const [selectedMonth, setSelectedMonth] = useState(getMonthKey());
   const [dateFilter, setDateFilter] = useState<{ startDate?: string; endDate?: string }>({});
   const [dbReady, setDbReady] = useState(false);
+
+  // ---------------------------
+  // RESET APP DATA
+  // ---------------------------
   const resetAppData = useCallback(async () => {
-  try {
-    // 1) Reset DB
-    await resetDatabase();
-
-    // 2) Ensure schema exists (extra safety)
-    await initializeDatabase();
-
-    // 3) Seed ONLY system categories
-    await categoryRepo.insertCategories(defaultCategories);
-
-    // 4) Reset UI filters
-    setSelectedMonth(getMonthKey());
-    setDateFilter({});
-
-    // 5) Clear cache
-    queryClient.clear();
-
-    // 6) Force refetch
-    await queryClient.invalidateQueries();
-  } catch (e) {
-    console.error('Reset App Data failed:', e);
-    throw e;
-  }
-}, [queryClient]);
-
-  // =========================
-  // DB INIT + SEED
-  // =========================
-
-  const seedDatabase = async () => {
-    const SEED_DEMO_DATA = false;
     try {
-        await runTransaction(async () => {
+      await resetDatabase();
+      await initializeDatabase();
+      await categoryRepo.insertCategories(defaultCategories);
+
+      setSelectedMonth(getMonthKey());
+      setDateFilter({});
+
+      queryClient.clear();
+      await queryClient.invalidateQueries();
+    } catch (e) {
+      console.error('Reset App Data failed:', e);
+      throw e;
+    }
+  }, [queryClient]);
+
+  // ---------------------------
+  // DB INIT + SEED
+  // ---------------------------
+  const seedDatabase = async () => {
+    try {
+      await runTransaction(async () => {
         await categoryRepo.insertCategories(defaultCategories);
-
-if (SEED_DEMO_DATA) {
-          await accountRepo.insertAccounts(sampleAccounts);
-          await transactionRepo.insertTransactions(sampleTransactions);
-          await budgetRepo.insertBudgets([sampleBudget]);
-          await goalRepo.insertGoals(sampleGoals);
-          await recurringRepo.insertRecurring(sampleRecurring);
-          await debtRepo.insertDebts(sampleDebts);
-          await investmentRepo.insertInvestments(sampleInvestments);
-      }
-
       });
 
       console.log('Database seeded successfully');
@@ -201,10 +257,9 @@ if (SEED_DEMO_DATA) {
     initDb();
   }, []);
 
-  // =========================
+  // ---------------------------
   // QUERIES
-  // =========================
-
+  // ---------------------------
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: async () => defaultSettings,
@@ -276,44 +331,70 @@ if (SEED_DEMO_DATA) {
   const alerts = alertsQuery.data ?? [];
   const settings = settingsQuery.data ?? defaultSettings;
 
-  // =========================
+  // ---------------------------
   // HELPERS
-  // =========================
+  // ---------------------------
+  const normalizeTransactionInput = useCallback(
+    (t: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
+      if (t.type === 'transfer') {
+        return { ...t, categoryId: TRANSFER_CATEGORY_ID };
+      }
+      return t;
+    },
+    []
+  );
 
-  const normalizeTransactionInput = (
-    t: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>
-  ): Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> => {
-    if (t.type === 'transfer') {
-      return { ...t, categoryId: TRANSFER_CATEGORY_ID };
-    }
-    return t;
-  };
+  /**
+   * SINGLE SOURCE OF TRUTH:
+   * Applies or reverses account balance updates.
+   */
+  const applyTransactionBalances = useCallback(
+    async (txn: Transaction, direction: 'apply' | 'reverse') => {
+      const multiplier = direction === 'apply' ? 1 : -1;
 
-  const isContributionTransaction = (t: Transaction) => t.type === 'income';
+      if (txn.type === 'expense' && txn.fromAccountId) {
+        await accountRepo.updateAccountBalance(txn.fromAccountId, multiplier * -txn.amount);
+      }
 
-  const recalcGoalAndInvestmentAfterTxnChange = async (oldTxn?: Transaction, newTxn?: Transaction) => {
-    const affectedGoalIds = new Set<string>();
-    const affectedInvestmentIds = new Set<string>();
+      if (txn.type === 'income' && txn.toAccountId) {
+        await accountRepo.updateAccountBalance(txn.toAccountId, multiplier * txn.amount);
+      }
 
-    if (oldTxn?.goalId) affectedGoalIds.add(oldTxn.goalId);
-    if (newTxn?.goalId) affectedGoalIds.add(newTxn.goalId);
+      if (txn.type === 'transfer' && txn.fromAccountId && txn.toAccountId) {
+        await accountRepo.updateAccountBalance(txn.fromAccountId, multiplier * -txn.amount);
+        await accountRepo.updateAccountBalance(txn.toAccountId, multiplier * txn.amount);
+      }
+    },
+    []
+  );
 
-    if (oldTxn?.investmentId) affectedInvestmentIds.add(oldTxn.investmentId);
-    if (newTxn?.investmentId) affectedInvestmentIds.add(newTxn.investmentId);
+  const isContributionTransaction = useCallback((t: Transaction) => t.type === 'income', []);
 
-    for (const goalId of affectedGoalIds) {
-      await goalRepo.recalculateGoalTotals(goalId);
-    }
+  const recalcGoalAndInvestmentAfterTxnChange = useCallback(
+    async (oldTxn?: Transaction, newTxn?: Transaction) => {
+      const affectedGoalIds = new Set<string>();
+      const affectedInvestmentIds = new Set<string>();
 
-    for (const invId of affectedInvestmentIds) {
-      await investmentRepo.recalculateInvestmentTotals(invId);
-    }
-  };
+      if (oldTxn?.goalId) affectedGoalIds.add(oldTxn.goalId);
+      if (newTxn?.goalId) affectedGoalIds.add(newTxn.goalId);
 
-  // =========================
-  // RECURRING "CRON JOB"
-  // =========================
+      if (oldTxn?.investmentId) affectedInvestmentIds.add(oldTxn.investmentId);
+      if (newTxn?.investmentId) affectedInvestmentIds.add(newTxn.investmentId);
 
+      for (const goalId of affectedGoalIds) {
+        await goalRepo.recalculateGoalTotals(goalId);
+      }
+
+      for (const invId of affectedInvestmentIds) {
+        await investmentRepo.recalculateInvestmentTotals(invId);
+      }
+    },
+    []
+  );
+
+  // ---------------------------
+  // RECURRING PROCESSOR
+  // ---------------------------
   const processRecurringTransactions = useCallback(async () => {
     const todayKey = toDateKey(new Date());
 
@@ -323,7 +404,6 @@ if (SEED_DEMO_DATA) {
     await runTransaction(async () => {
       for (const rec of dueRecurring) {
         let runDate = rec.nextRunDate;
-
         if (!runDate) continue;
 
         while (runDate <= todayKey) {
@@ -340,8 +420,6 @@ if (SEED_DEMO_DATA) {
               id: txnId,
               type: rec.type,
               amount: rec.amount,
-
-              // store ISO, but keep the correct day
               date: new Date(runDate + 'T12:00:00.000Z').toISOString(),
 
               categoryId: rec.type === 'transfer' ? TRANSFER_CATEGORY_ID : rec.categoryId,
@@ -359,19 +437,20 @@ if (SEED_DEMO_DATA) {
               updatedAt: new Date().toISOString(),
             };
 
+            // ✅ CREDIT RULES VALIDATION
+            const fromAcc = newTxn.fromAccountId
+              ? await accountRepo.getAccountById(newTxn.fromAccountId)
+              : null;
+
+            const toAcc = newTxn.toAccountId
+              ? await accountRepo.getAccountById(newTxn.toAccountId)
+              : null;
+
+            assertCreditCardRules({ txn: newTxn, fromAccount: fromAcc, toAccount: toAcc });
+
             await transactionRepo.createTransaction(newTxn);
+            await applyTransactionBalances(newTxn, 'apply');
 
-            // Apply balances
-            if (newTxn.type === 'expense' && newTxn.fromAccountId) {
-              await accountRepo.updateAccountBalance(newTxn.fromAccountId, -newTxn.amount);
-            } else if (newTxn.type === 'income' && newTxn.toAccountId) {
-              await accountRepo.updateAccountBalance(newTxn.toAccountId, newTxn.amount);
-            } else if (newTxn.type === 'transfer' && newTxn.fromAccountId && newTxn.toAccountId) {
-              await accountRepo.updateAccountBalance(newTxn.fromAccountId, -newTxn.amount);
-              await accountRepo.updateAccountBalance(newTxn.toAccountId, newTxn.amount);
-            }
-
-            // Run log
             await recurringRunRepo.createRecurringRun({
               id: generateId(),
               recurringId: rec.id,
@@ -381,11 +460,6 @@ if (SEED_DEMO_DATA) {
             });
 
             const nextRunDate = computeNextRunDate(rec, runDate);
-
-            // This function MUST exist in recurringRepo
-            // It should update:
-            // - last_run_date = runDate
-            // - next_run_date = nextRunDate
             await recurringRepo.markRecurringRun(rec.id, runDate, nextRunDate);
 
             runDate = nextRunDate;
@@ -397,7 +471,7 @@ if (SEED_DEMO_DATA) {
               recurringId: rec.id,
               runDate,
               status: 'failed',
-              reason: 'Failed to generate transaction',
+              reason: e instanceof Error ? e.message : 'Failed to generate transaction',
             });
 
             break;
@@ -409,9 +483,8 @@ if (SEED_DEMO_DATA) {
     await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     await queryClient.invalidateQueries({ queryKey: ['accounts'] });
     await queryClient.invalidateQueries({ queryKey: ['recurring'] });
-  }, [queryClient]);
+  }, [applyTransactionBalances, queryClient]);
 
-  // Run recurring processor once DB is ready
   useEffect(() => {
     if (!dbReady) return;
 
@@ -420,17 +493,14 @@ if (SEED_DEMO_DATA) {
     });
   }, [dbReady, processRecurringTransactions]);
 
-  // =========================
+  // ---------------------------
   // BUDGET ALERTS
-  // =========================
-
+  // ---------------------------
   const checkBudgetAlertsForExpense = useCallback(
     async (txn: Transaction) => {
       if (txn.type !== 'expense') return;
 
       const month = txn.date.slice(0, 7);
-
-      // IMPORTANT: Use budgets from state (already loaded)
       const budget = budgets.find(b => b.month === month);
       if (!budget) return;
 
@@ -450,13 +520,9 @@ if (SEED_DEMO_DATA) {
         .reduce((sum, t) => sum + t.amount, 0);
 
       const percent = line.planned > 0 ? Math.round((spent / line.planned) * 100) : 0;
-
       if (percent < (line.alertThreshold ?? 80)) return;
 
       const category = categories.find(c => c.id === txn.categoryId);
-
-      // Your Alert type in types.ts supports:
-      // 'budget_warning' | 'budget_exceeded'
       const alertType: Alert['type'] = percent >= 100 ? 'budget_exceeded' : 'budget_warning';
 
       const title = `Budget Alert: ${category?.name ?? 'Category'}`;
@@ -484,10 +550,9 @@ if (SEED_DEMO_DATA) {
     [budgets, transactions, categories]
   );
 
-  // =========================
+  // ---------------------------
   // TRANSACTION MUTATIONS
-  // =========================
-
+  // ---------------------------
   const addTransactionMutation = useMutation({
     mutationFn: async (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
       const normalized = normalizeTransactionInput(transaction);
@@ -500,20 +565,19 @@ if (SEED_DEMO_DATA) {
       };
 
       await runTransaction(async () => {
-        await transactionRepo.createTransaction(newTransaction);
+        // ✅ CREDIT RULES VALIDATION (INSIDE TRANSACTION)
+        const fromAcc = newTransaction.fromAccountId
+          ? await accountRepo.getAccountById(newTransaction.fromAccountId)
+          : null;
 
-        if (newTransaction.type === 'expense' && newTransaction.fromAccountId) {
-          await accountRepo.updateAccountBalance(newTransaction.fromAccountId, -newTransaction.amount);
-        } else if (newTransaction.type === 'income' && newTransaction.toAccountId) {
-          await accountRepo.updateAccountBalance(newTransaction.toAccountId, newTransaction.amount);
-        } else if (
-          newTransaction.type === 'transfer' &&
-          newTransaction.fromAccountId &&
-          newTransaction.toAccountId
-        ) {
-          await accountRepo.updateAccountBalance(newTransaction.fromAccountId, -newTransaction.amount);
-          await accountRepo.updateAccountBalance(newTransaction.toAccountId, newTransaction.amount);
-        }
+        const toAcc = newTransaction.toAccountId
+          ? await accountRepo.getAccountById(newTransaction.toAccountId)
+          : null;
+
+        assertCreditCardRules({ txn: newTransaction, fromAccount: fromAcc, toAccount: toAcc });
+
+        await transactionRepo.createTransaction(newTransaction);
+        await applyTransactionBalances(newTransaction, 'apply');
 
         if (isContributionTransaction(newTransaction)) {
           await recalcGoalAndInvestmentAfterTxnChange(undefined, newTransaction);
@@ -560,25 +624,17 @@ if (SEED_DEMO_DATA) {
       };
 
       await runTransaction(async () => {
-        // Reverse old balances
-        if (oldTxn.type === 'expense' && oldTxn.fromAccountId) {
-          await accountRepo.updateAccountBalance(oldTxn.fromAccountId, oldTxn.amount);
-        } else if (oldTxn.type === 'income' && oldTxn.toAccountId) {
-          await accountRepo.updateAccountBalance(oldTxn.toAccountId, -oldTxn.amount);
-        } else if (oldTxn.type === 'transfer' && oldTxn.fromAccountId && oldTxn.toAccountId) {
-          await accountRepo.updateAccountBalance(oldTxn.fromAccountId, oldTxn.amount);
-          await accountRepo.updateAccountBalance(oldTxn.toAccountId, -oldTxn.amount);
-        }
+        // Reverse old first
+        await applyTransactionBalances(oldTxn, 'reverse');
 
-        // Apply new balances
-        if (txn.type === 'expense' && txn.fromAccountId) {
-          await accountRepo.updateAccountBalance(txn.fromAccountId, -txn.amount);
-        } else if (txn.type === 'income' && txn.toAccountId) {
-          await accountRepo.updateAccountBalance(txn.toAccountId, txn.amount);
-        } else if (txn.type === 'transfer' && txn.fromAccountId && txn.toAccountId) {
-          await accountRepo.updateAccountBalance(txn.fromAccountId, -txn.amount);
-          await accountRepo.updateAccountBalance(txn.toAccountId, txn.amount);
-        }
+        // Validate against NEW balances after reverse
+        const fromAcc = txn.fromAccountId ? await accountRepo.getAccountById(txn.fromAccountId) : null;
+        const toAcc = txn.toAccountId ? await accountRepo.getAccountById(txn.toAccountId) : null;
+
+        assertCreditCardRules({ txn, fromAccount: fromAcc, toAccount: toAcc });
+
+        // Apply new
+        await applyTransactionBalances(txn, 'apply');
 
         await transactionRepo.updateTransaction(txn);
 
@@ -606,15 +662,7 @@ if (SEED_DEMO_DATA) {
       if (!transaction) throw new Error('Transaction not found');
 
       await runTransaction(async () => {
-        if (transaction.type === 'expense' && transaction.fromAccountId) {
-          await accountRepo.updateAccountBalance(transaction.fromAccountId, transaction.amount);
-        } else if (transaction.type === 'income' && transaction.toAccountId) {
-          await accountRepo.updateAccountBalance(transaction.toAccountId, -transaction.amount);
-        } else if (transaction.type === 'transfer' && transaction.fromAccountId && transaction.toAccountId) {
-          await accountRepo.updateAccountBalance(transaction.fromAccountId, transaction.amount);
-          await accountRepo.updateAccountBalance(transaction.toAccountId, -transaction.amount);
-        }
-
+        await applyTransactionBalances(transaction, 'reverse');
         await transactionRepo.deleteTransaction(transactionId);
 
         if (isContributionTransaction(transaction)) {
@@ -637,12 +685,19 @@ if (SEED_DEMO_DATA) {
     },
   });
 
-  // =========================
+  // ---------------------------
   // ACCOUNT MUTATIONS
-  // =========================
-
+  // ---------------------------
   const addAccountMutation = useMutation({
     mutationFn: async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
+      // ✅ CREDIT CARD MUST HAVE LIMIT ALWAYS
+      if (account.type === 'credit_card') {
+        const limit = account.creditLimit ?? 0;
+        if (limit <= 0) {
+          throw new Error('Credit card limit is required.');
+        }
+      }
+
       const newAccount: Account = {
         ...account,
         id: generateId(),
@@ -660,6 +715,14 @@ if (SEED_DEMO_DATA) {
 
   const updateAccountMutation = useMutation({
     mutationFn: async (account: Account) => {
+      // ✅ CREDIT CARD MUST HAVE LIMIT ALWAYS
+      if (account.type === 'credit_card') {
+        const limit = account.creditLimit ?? 0;
+        if (limit <= 0) {
+          throw new Error('Credit card limit is required.');
+        }
+      }
+
       const updatedAccount = { ...account, updatedAt: new Date().toISOString() };
       await accountRepo.updateAccount(updatedAccount);
       return updatedAccount;
@@ -682,10 +745,9 @@ if (SEED_DEMO_DATA) {
     },
   });
 
-  // =========================
+  // ---------------------------
   // CATEGORY MUTATIONS
-  // =========================
-
+  // ---------------------------
   const addCategoryMutation = useMutation({
     mutationFn: async (category: Omit<Category, 'id'>) => {
       const newCategory: Category = { ...category, id: generateId() };
@@ -720,10 +782,9 @@ if (SEED_DEMO_DATA) {
     },
   });
 
-  // =========================
+  // ---------------------------
   // BUDGET MUTATIONS
-  // =========================
-
+  // ---------------------------
   const addBudgetMutation = useMutation({
     mutationFn: async (budget: Omit<Budget, 'id' | 'createdAt' | 'updatedAt'>) => {
       const existing = budgets.find(b => b.month === budget.month);
@@ -773,10 +834,9 @@ if (SEED_DEMO_DATA) {
     },
   });
 
-  // =========================
+  // ---------------------------
   // GOAL MUTATIONS
-  // =========================
-
+  // ---------------------------
   const addGoalMutation = useMutation({
     mutationFn: async (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => {
       const newGoal: Goal = {
@@ -815,10 +875,9 @@ if (SEED_DEMO_DATA) {
     },
   });
 
-  // =========================
+  // ---------------------------
   // RECURRING MUTATIONS
-  // =========================
-
+  // ---------------------------
   const addRecurringMutation = useMutation({
     mutationFn: async (item: Omit<Recurring, 'id' | 'createdAt' | 'updatedAt'>) => {
       const newItem: Recurring = {
@@ -857,10 +916,9 @@ if (SEED_DEMO_DATA) {
     },
   });
 
-  // =========================
+  // ---------------------------
   // INVESTMENT MUTATIONS
-  // =========================
-
+  // ---------------------------
   const addInvestmentMutation = useMutation({
     mutationFn: async (investment: Omit<Investment, 'id' | 'createdAt' | 'updatedAt'>) => {
       const newInvestment: Investment = {
@@ -899,10 +957,9 @@ if (SEED_DEMO_DATA) {
     },
   });
 
-  // =========================
+  // ---------------------------
   // DEBT MUTATIONS
-  // =========================
-
+  // ---------------------------
   const addDebtMutation = useMutation({
     mutationFn: async (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => {
       const newDebt: Debt = {
@@ -941,10 +998,9 @@ if (SEED_DEMO_DATA) {
     },
   });
 
-  // =========================
+  // ---------------------------
   // STATS + HELPERS
-  // =========================
-
+  // ---------------------------
   const getMonthlyStats = useCallback(
     (month: string): MonthlyStats => {
       const startDate = getStartOfMonth(month);
@@ -1055,7 +1111,8 @@ if (SEED_DEMO_DATA) {
   const getTransactionById = useCallback((id: string) => transactions.find(t => t.id === id), [transactions]);
 
   const checkAccountHasTransactions = useCallback(
-    (accountId: string) => transactions.some(t => t.fromAccountId === accountId || t.toAccountId === accountId),
+    (accountId: string) =>
+      transactions.some(t => t.fromAccountId === accountId || t.toAccountId === accountId),
     [transactions]
   );
 
@@ -1064,6 +1121,9 @@ if (SEED_DEMO_DATA) {
     [transactions]
   );
 
+  // ---------------------------
+  // RETURN PROVIDER
+  // ---------------------------
   return {
     accounts,
     transactions,
@@ -1076,6 +1136,7 @@ if (SEED_DEMO_DATA) {
     alerts,
     settings,
     resetAppData,
+
     selectedMonth,
     setSelectedMonth,
 

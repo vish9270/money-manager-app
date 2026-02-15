@@ -13,14 +13,19 @@ import {
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+
 import { useMoney } from '@/providers/MoneyProvider';
 import Colors from '@/constants/colors';
-import { TransactionType, Transaction } from '@/types';
+import { TransactionType, Transaction, Account } from '@/types';
+
 import SearchablePicker from '@/components/SearchablePicker';
 import DatePicker from '@/components/DatePicker';
 
 const TRANSFER_CATEGORY_ID = 'cat_transfer';
 
+// ---------------------------
+// AMOUNT HELPERS
+// ---------------------------
 function sanitizeAmountInput(value: string) {
   let v = value.replace(/[^0-9.]/g, '');
 
@@ -50,6 +55,22 @@ function parseAmount(value: string): number | null {
   return n;
 }
 
+// ---------------------------
+// CREDIT CARD HELPERS (UI)
+// ---------------------------
+function isCreditCard(account?: Account | null) {
+  return account?.type === 'credit_card';
+}
+
+function getOutstanding(balance: number) {
+  // credit card stored negative when due
+  return Math.abs(Math.min(balance, 0));
+}
+
+function getAvailable(limit: number, balance: number) {
+  return Math.max(0, limit - getOutstanding(balance));
+}
+
 export default function AddTransactionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ type?: string; id?: string }>();
@@ -69,7 +90,6 @@ export default function AddTransactionScreen() {
   } = useMoney();
 
   const isEditing = !!params.id;
-
   const existingTransaction = isEditing && params.id ? getTransactionById(params.id) : null;
 
   // IMPORTANT:
@@ -94,7 +114,6 @@ export default function AddTransactionScreen() {
 
   // =========================
   // Populate form on edit
-  // (Fixes the "blank edit screen" bug)
   // =========================
   useEffect(() => {
     if (!isEditing) return;
@@ -111,6 +130,9 @@ export default function AddTransactionScreen() {
     setDate(new Date(existingTransaction.date));
   }, [isEditing, existingTransaction]);
 
+  // =========================
+  // Filter categories
+  // =========================
   const filteredCategories = useMemo(() => {
     if (type === 'income') return categories.filter(c => c.type === 'income' || c.type === 'both');
     if (type === 'expense') return categories.filter(c => c.type === 'expense' || c.type === 'both');
@@ -123,6 +145,9 @@ export default function AddTransactionScreen() {
     [filteredCategories]
   );
 
+  // =========================
+  // Account pickers
+  // =========================
   const accountItems = useMemo(
     () => accounts.map(a => ({ id: a.id, name: a.name, color: a.color })),
     [accounts]
@@ -131,7 +156,9 @@ export default function AddTransactionScreen() {
   const goalItems = useMemo(
     () => [
       { id: '', name: 'None', color: Colors.textMuted },
-      ...goals.filter(g => g.status === 'active').map(g => ({ id: g.id, name: g.name, color: g.color })),
+      ...goals
+        .filter(g => g.status === 'active')
+        .map(g => ({ id: g.id, name: g.name, color: g.color })),
     ],
     [goals]
   );
@@ -146,7 +173,6 @@ export default function AddTransactionScreen() {
 
   // =========================
   // Reset fields when switching type
-  // (new transaction only)
   // =========================
   useEffect(() => {
     if (isEditing) return;
@@ -171,19 +197,21 @@ export default function AddTransactionScreen() {
     if (!selectedGoalId) return;
     if (!selectedInvestmentId) return;
 
-    // If both set, keep the most recent selection.
-    // Here: goal wins.
+    // goal wins
     setSelectedInvestmentId('');
-  }, [selectedGoalId]);
+  }, [selectedGoalId, selectedInvestmentId]);
 
   useEffect(() => {
     if (!selectedInvestmentId) return;
     if (!selectedGoalId) return;
 
-    // investment wins if selected after goal
+    // investment wins
     setSelectedGoalId('');
-  }, [selectedInvestmentId]);
+  }, [selectedGoalId, selectedInvestmentId]);
 
+  // =========================
+  // SUBMIT
+  // =========================
   const handleSubmit = async () => {
     if (isPending) return;
 
@@ -227,6 +255,54 @@ export default function AddTransactionScreen() {
       return;
     }
 
+    // ---------------------------
+    // UI CREDIT CARD VALIDATION
+    // (fast feedback before provider throws)
+    // ---------------------------
+    const fromAccount = accounts.find(a => a.id === selectedFromAccountId) ?? null;
+    const toAccount = accounts.find(a => a.id === selectedToAccountId) ?? null;
+
+    // 1) Spending on credit card
+    if (type === 'expense' && isCreditCard(fromAccount)) {
+      const limit = fromAccount?.creditLimit ?? 0;
+
+      if (limit <= 0) {
+        Alert.alert('Error', 'This credit card has no limit set.');
+        return;
+      }
+
+      const available = getAvailable(limit, fromAccount!.balance);
+
+      if (parsedAmount > available) {
+        Alert.alert(
+          'Credit Limit Exceeded',
+          `Available: ₹${available.toFixed(0)}\nTrying to spend: ₹${parsedAmount.toFixed(0)}`
+        );
+        return;
+      }
+    }
+
+    // 2) Paying credit card (transfer INTO credit card)
+    if (type === 'transfer' && isCreditCard(toAccount)) {
+      const outstanding = getOutstanding(toAccount!.balance);
+
+      if (outstanding <= 0) {
+        Alert.alert('Error', 'This credit card has no outstanding due to pay.');
+        return;
+      }
+
+      if (parsedAmount > outstanding) {
+        Alert.alert(
+          'Payment Too High',
+          `Outstanding Due: ₹${outstanding.toFixed(0)}\nTrying to pay: ₹${parsedAmount.toFixed(0)}`
+        );
+        return;
+      }
+    }
+
+    // ---------------------------
+    // Build transaction payload
+    // ---------------------------
     const transactionData: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
       type,
       amount: parsedAmount,
@@ -259,11 +335,15 @@ export default function AddTransactionScreen() {
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
-    } catch (e) {
-      console.error('Transaction save failed', e);
-      Alert.alert('Error', 'Failed to save transaction. Please try again.');
-    }
-  };
+  } catch (e) {
+  console.error('Transaction save failed', e);
+
+  const message =
+    e instanceof Error ? e.message : 'Failed to save transaction. Please try again.';
+
+      Alert.alert('Error', message);
+  } 
+};
 
   const typeButtons: { type: TransactionType; label: string; icon: React.ReactNode; color: string }[] = [
     {
@@ -320,7 +400,11 @@ export default function AddTransactionScreen() {
           ),
           headerRight: () => (
             <TouchableOpacity onPress={handleSubmit} disabled={isPending}>
-              <Ionicons name="checkmark" size={24} color={isPending ? Colors.textMuted : Colors.accent} />
+              <Ionicons
+                name="checkmark"
+                size={24}
+                color={isPending ? Colors.textMuted : Colors.accent}
+              />
             </TouchableOpacity>
           ),
         }}
@@ -408,7 +492,6 @@ export default function AddTransactionScreen() {
           </View>
         )}
 
-        {/* Optional links */}
         <View style={styles.section}>
           <SearchablePicker
             items={goalItems}
@@ -456,7 +539,13 @@ export default function AddTransactionScreen() {
           disabled={isPending}
         >
           <Text style={styles.submitButtonText}>
-            {isPending ? (isEditing ? 'Saving...' : 'Adding...') : isEditing ? 'Save Changes' : 'Add Transaction'}
+            {isPending
+              ? isEditing
+                ? 'Saving...'
+                : 'Adding...'
+              : isEditing
+                ? 'Save Changes'
+                : 'Add Transaction'}
           </Text>
         </TouchableOpacity>
 
