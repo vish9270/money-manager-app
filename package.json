@@ -3,12 +3,13 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-  "start": "expo start",
-  "android": "expo start --android",
-  "ios": "expo start --ios",
-  "web": "expo start --web",
-  "lint": "expo lint"
-},
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "check:routes": "node scripts/validate-router-paths.js"
+  },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@nkzw/create-context-hook": "^1.1.0",
